@@ -1,11 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertCircle, Calendar, TrendingUp } from "lucide-react";
+import { AlertCircle, Calendar, CheckSquare, TrendingUp } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import NewOpportunityModal from "../components/NewOpportunityModal";
 import StageBadge from "../components/StageBadge";
+import TodoKanban from "../components/TodoKanban";
 import { useOpportunities } from "../hooks/useQueries";
 
 const STAGES = [
@@ -205,6 +206,17 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      {/* Team To-Dos */}
+      <div className="mt-12">
+        <div className="flex items-center gap-2 mb-4">
+          <CheckSquare className="w-5 h-5 text-primary" />
+          <h2 className="font-display text-xl font-bold text-foreground">
+            Team To-Dos
+          </h2>
+        </div>
+        <TodoKanban />
+      </div>
     </div>
   );
 }

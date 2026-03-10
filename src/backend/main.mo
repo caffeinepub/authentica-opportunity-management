@@ -2,12 +2,13 @@ import Map "mo:core/Map";
 import Array "mo:core/Array";
 import Time "mo:core/Time";
 import Nat "mo:core/Nat";
-import Int "mo:core/Int";
 import Text "mo:core/Text";
+import Int "mo:core/Int";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
-import Order "mo:core/Order";
 import Storage "blob-storage/Storage";
+import Order "mo:core/Order";
+import Iter "mo:core/Iter";
 import MixinStorage "blob-storage/Mixin";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
@@ -294,7 +295,37 @@ actor {
 
   // User Profile Type
   public type UserProfile = {
+    name : Text; // Display name
+  };
+
+  public type UserProfileDTO = {
+    principal : Principal;
     name : Text;
+  };
+
+  // Calendar Item Type
+  public type CalendarItem = {
+    id : Nat;
+    title : Text;
+    dateTimestamp : Int;
+    timeLabel : Text;
+    notes : Text;
+    opportunityId : ?Nat;
+    createdBy : Text;
+  };
+
+  public type TodoStage = {
+    #todo;
+    #inProgress;
+    #done;
+  };
+
+  public type TodoItem = {
+    id : Nat;
+    title : Text;
+    assignedTo : Text; // Display name of assignee
+    stage : Text; // #todo | #inProgress | #done
+    createdAt : Int;
   };
 
   // Persistent Storage
@@ -303,6 +334,8 @@ actor {
   let comments = Map.empty<Nat, InternalComment>();
   let fileRecords = Map.empty<Nat, InternalFileRecord>();
   let userProfiles = Map.empty<Principal, UserProfile>();
+  let calendarItems = Map.empty<Nat, CalendarItem>();
+  let todoItems = Map.empty<Nat, TodoItem>();
   let contactLinks = Map.empty<Nat, [Nat]>();
 
   // ID Counters
@@ -310,6 +343,8 @@ actor {
   var contactCounter = 0;
   var commentCounter = 0;
   var fileRecordCounter = 0;
+  var calendarItemCounter = 0;
+  var todoItemCounter = 0;
 
   // Helper Functions
   func ensureUserRegistered(caller : Principal) {
@@ -340,6 +375,17 @@ actor {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
     userProfiles.add(caller, profile);
+  };
+
+  public query ({ caller }) func listAllUserProfiles() : async [UserProfileDTO] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can list user profiles");
+    };
+    userProfiles.toArray().map<(Principal, UserProfile), UserProfileDTO>(
+      func((principal, profile)) {
+        { principal; name = profile.name };
+      }
+    );
   };
 
   // Opportunity Functions
@@ -688,5 +734,104 @@ actor {
     };
 
     fileRecords.values().toArray().filter(func(f) { f.opportunityId == opportunityId }).map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
+  };
+
+  // CalendarItem
+  public shared ({ caller }) func createCalendarItem(title : Text, dateTimestamp : Int, timeLabel : Text, notes : Text, opportunityId : ?Nat, createdBy : Text) : async CalendarItem {
+    ensureUserRegistered(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can create calendar items");
+    };
+
+    let newCalendarItem : CalendarItem = {
+      id = calendarItemCounter;
+      title;
+      dateTimestamp;
+      timeLabel;
+      notes;
+      opportunityId;
+      createdBy;
+    };
+
+    calendarItems.add(calendarItemCounter, newCalendarItem);
+    calendarItemCounter += 1;
+
+    newCalendarItem;
+  };
+
+  public shared ({ caller }) func deleteCalendarItem(id : Nat) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete calendar items");
+    };
+
+    calendarItems.remove(id);
+    true;
+  };
+
+  public query ({ caller }) func listCalendarItems() : async [CalendarItem] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can list calendar items");
+    };
+
+    calendarItems.values().toArray();
+  };
+
+  // TodoItem
+  public shared ({ caller }) func createTodoItem(title : Text, assignedTo : Text, stage : Text) : async TodoItem {
+    ensureUserRegistered(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can create todo items");
+    };
+
+    let newTodoItem : TodoItem = {
+      id = todoItemCounter;
+      title;
+      assignedTo;
+      stage;
+      createdAt = Int.abs(Time.now());
+    };
+
+    todoItems.add(todoItemCounter, newTodoItem);
+    todoItemCounter += 1;
+
+    newTodoItem;
+  };
+
+  public shared ({ caller }) func updateTodoItem(id : Nat, title : Text, assignedTo : Text, stage : Text) : async ?TodoItem {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can update todo items");
+    };
+
+    switch (todoItems.get(id)) {
+      case (null) { null };
+      case (?existing) {
+        let updatedTodoItem : TodoItem = {
+          id;
+          title;
+          assignedTo;
+          stage;
+          createdAt = existing.createdAt;
+        };
+        todoItems.add(id, updatedTodoItem);
+        ?updatedTodoItem;
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteTodoItem(id : Nat) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete todo items");
+    };
+
+    todoItems.remove(id);
+    true;
+  };
+
+  public query ({ caller }) func listTodoItems() : async [TodoItem] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can list todo items");
+    };
+
+    todoItems.values().toArray();
   };
 };

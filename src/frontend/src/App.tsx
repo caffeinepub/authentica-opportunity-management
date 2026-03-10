@@ -10,6 +10,7 @@ import { LogIn, TrendingUp } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import { UserProvider } from "./context/UserContext";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import CalendarPage from "./pages/CalendarPage";
 import ContactsPage from "./pages/ContactsPage";
 import Dashboard from "./pages/Dashboard";
 import OpportunityDetail from "./pages/OpportunityDetail";
@@ -112,10 +113,17 @@ const opportunityRoute = createRoute({
   component: OpportunityDetail,
 });
 
+const calendarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/calendar",
+  component: CalendarPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   contactsRoute,
   opportunityRoute,
+  calendarRoute,
 ]);
 
 const router = createRouter({ routeTree });

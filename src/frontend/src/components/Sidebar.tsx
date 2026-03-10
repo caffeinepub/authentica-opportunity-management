@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Calendar,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -56,6 +57,14 @@ export default function Sidebar() {
         >
           <Users className="w-4 h-4 shrink-0" />
           Contacts
+        </Link>
+        <Link
+          to="/calendar"
+          data-ocid="nav.calendar.link"
+          className={navItemClass("/calendar")}
+        >
+          <Calendar className="w-4 h-4 shrink-0" />
+          Calendar
         </Link>
       </nav>
 

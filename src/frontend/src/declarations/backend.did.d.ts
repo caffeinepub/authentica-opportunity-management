@@ -10,6 +10,15 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface CalendarItem {
+  'id' : bigint,
+  'title' : string,
+  'timeLabel' : string,
+  'createdBy' : string,
+  'opportunityId' : [] | [bigint],
+  'notes' : string,
+  'dateTimestamp' : bigint,
+}
 export interface Comment {
   'id' : bigint,
   'createdAt' : bigint,
@@ -44,7 +53,15 @@ export interface Opportunity {
   'summary' : string,
   'stage' : string,
 }
+export interface TodoItem {
+  'id' : bigint,
+  'title' : string,
+  'assignedTo' : string,
+  'createdAt' : bigint,
+  'stage' : string,
+}
 export interface UserProfile { 'name' : string }
+export interface UserProfileDTO { 'principal' : Principal, 'name' : string }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
@@ -87,13 +104,20 @@ export interface _SERVICE {
     FileRecord
   >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'createCalendarItem' : ActorMethod<
+    [string, bigint, string, string, [] | [bigint], string],
+    CalendarItem
+  >,
   'createOpportunity' : ActorMethod<
     [string, string, bigint, bigint, string],
     Opportunity
   >,
+  'createTodoItem' : ActorMethod<[string, string, string], TodoItem>,
+  'deleteCalendarItem' : ActorMethod<[bigint], boolean>,
   'deleteComment' : ActorMethod<[bigint], boolean>,
   'deleteFileRecord' : ActorMethod<[bigint], boolean>,
   'deleteOpportunity' : ActorMethod<[bigint], boolean>,
+  'deleteTodoItem' : ActorMethod<[bigint], boolean>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getContact' : ActorMethod<[bigint], [] | [Contact]>,
@@ -102,10 +126,13 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'linkContactToOpportunity' : ActorMethod<[bigint, bigint], boolean>,
   'listAllContacts' : ActorMethod<[], Array<Contact>>,
+  'listAllUserProfiles' : ActorMethod<[], Array<UserProfileDTO>>,
+  'listCalendarItems' : ActorMethod<[], Array<CalendarItem>>,
   'listComments' : ActorMethod<[bigint], Array<Comment>>,
   'listContactsByOpportunity' : ActorMethod<[bigint], Array<Contact>>,
   'listFileRecords' : ActorMethod<[bigint], Array<FileRecord>>,
   'listOpportunities' : ActorMethod<[], Array<Opportunity>>,
+  'listTodoItems' : ActorMethod<[], Array<TodoItem>>,
   'removeContact' : ActorMethod<[bigint], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'unlinkContactFromOpportunity' : ActorMethod<[bigint, bigint], boolean>,
@@ -117,6 +144,10 @@ export interface _SERVICE {
   'updateOpportunity' : ActorMethod<
     [bigint, string, string, bigint, bigint, string],
     [] | [Opportunity]
+  >,
+  'updateTodoItem' : ActorMethod<
+    [bigint, string, string, string],
+    [] | [TodoItem]
   >,
 }
 export declare const idlService: IDL.ServiceClass;

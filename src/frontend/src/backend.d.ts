@@ -7,6 +7,15 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export interface Opportunity {
+    id: bigint;
+    closeDate: bigint;
+    value: bigint;
+    name: string;
+    createdAt: bigint;
+    summary: string;
+    stage: string;
+}
 export interface Comment {
     id: bigint;
     createdAt: bigint;
@@ -22,6 +31,13 @@ export interface Contact {
     email: string;
     phone: string;
 }
+export interface TodoItem {
+    id: bigint;
+    title: string;
+    assignedTo: string;
+    createdAt: bigint;
+    stage: string;
+}
 export interface FileRecord {
     id: bigint;
     displayName: string;
@@ -32,17 +48,21 @@ export interface FileRecord {
     uploadedBy: string;
     folder: string;
 }
-export interface UserProfile {
+export interface CalendarItem {
+    id: bigint;
+    title: string;
+    timeLabel: string;
+    createdBy: string;
+    opportunityId?: bigint;
+    notes: string;
+    dateTimestamp: bigint;
+}
+export interface UserProfileDTO {
+    principal: Principal;
     name: string;
 }
-export interface Opportunity {
-    id: bigint;
-    closeDate: bigint;
-    value: bigint;
+export interface UserProfile {
     name: string;
-    createdAt: bigint;
-    summary: string;
-    stage: string;
 }
 export enum UserRole {
     admin = "admin",
@@ -55,10 +75,14 @@ export interface backendInterface {
     addContactAndLink(name: string, email: string, phone: string, title: string, opportunityId: bigint): Promise<Contact>;
     addFileRecord(opportunityId: bigint, displayName: string, folder: string, blobId: string, fileType: string, uploadedBy: string): Promise<FileRecord>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    createCalendarItem(title: string, dateTimestamp: bigint, timeLabel: string, notes: string, opportunityId: bigint | null, createdBy: string): Promise<CalendarItem>;
     createOpportunity(name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity>;
+    createTodoItem(title: string, assignedTo: string, stage: string): Promise<TodoItem>;
+    deleteCalendarItem(id: bigint): Promise<boolean>;
     deleteComment(id: bigint): Promise<boolean>;
     deleteFileRecord(id: bigint): Promise<boolean>;
     deleteOpportunity(id: bigint): Promise<boolean>;
+    deleteTodoItem(id: bigint): Promise<boolean>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getContact(id: bigint): Promise<Contact | null>;
@@ -67,14 +91,18 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     linkContactToOpportunity(contactId: bigint, opportunityId: bigint): Promise<boolean>;
     listAllContacts(): Promise<Array<Contact>>;
+    listAllUserProfiles(): Promise<Array<UserProfileDTO>>;
+    listCalendarItems(): Promise<Array<CalendarItem>>;
     listComments(opportunityId: bigint): Promise<Array<Comment>>;
     listContactsByOpportunity(opportunityId: bigint): Promise<Array<Contact>>;
     listFileRecords(opportunityId: bigint): Promise<Array<FileRecord>>;
     listOpportunities(): Promise<Array<Opportunity>>;
+    listTodoItems(): Promise<Array<TodoItem>>;
     removeContact(id: bigint): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     unlinkContactFromOpportunity(contactId: bigint, opportunityId: bigint): Promise<boolean>;
     updateContact(id: bigint, name: string, email: string, phone: string, title: string): Promise<Contact | null>;
     updateFileRecord(id: bigint, displayName: string, folder: string): Promise<FileRecord | null>;
     updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity | null>;
+    updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string): Promise<TodoItem | null>;
 }

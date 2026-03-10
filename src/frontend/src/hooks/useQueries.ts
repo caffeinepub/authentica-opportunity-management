@@ -1,8 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Comment, Contact, FileRecord, Opportunity } from "../backend";
+import type {
+  CalendarItem,
+  Comment,
+  Contact,
+  FileRecord,
+  Opportunity,
+  TodoItem,
+  UserProfileDTO,
+} from "../backend";
 import { useActor } from "./useActor";
 
-export type { Opportunity, Contact, Comment, FileRecord };
+export type {
+  Opportunity,
+  Contact,
+  Comment,
+  FileRecord,
+  CalendarItem,
+  TodoItem,
+  UserProfileDTO,
+};
 
 // ── Opportunities ──────────────────────────────────────────────────────────
 
@@ -348,5 +364,135 @@ export function useDeleteFileRecord() {
       qc.invalidateQueries({
         queryKey: ["files", vars.opportunityId.toString()],
       }),
+  });
+}
+
+// ── Calendar Items ─────────────────────────────────────────────────────────
+
+export function useCalendarItems() {
+  const { actor, isFetching } = useActor();
+  return useQuery<CalendarItem[]>({
+    queryKey: ["calendarItems"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listCalendarItems();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useCreateCalendarItem() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      title: string;
+      dateTimestamp: bigint;
+      timeLabel: string;
+      notes: string;
+      opportunityId: bigint | null;
+      createdBy: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.createCalendarItem(
+        data.title,
+        data.dateTimestamp,
+        data.timeLabel,
+        data.notes,
+        data.opportunityId,
+        data.createdBy,
+      );
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendarItems"] }),
+  });
+}
+
+export function useDeleteCalendarItem() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deleteCalendarItem(id);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendarItems"] }),
+  });
+}
+
+// ── Todo Items ─────────────────────────────────────────────────────────────
+
+export function useTodoItems() {
+  const { actor, isFetching } = useActor();
+  return useQuery<TodoItem[]>({
+    queryKey: ["todoItems"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listTodoItems();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useCreateTodoItem() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      title: string;
+      assignedTo: string;
+      stage: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.createTodoItem(data.title, data.assignedTo, data.stage);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["todoItems"] }),
+  });
+}
+
+export function useUpdateTodoItem() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      id: bigint;
+      title: string;
+      assignedTo: string;
+      stage: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.updateTodoItem(
+        data.id,
+        data.title,
+        data.assignedTo,
+        data.stage,
+      );
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["todoItems"] }),
+  });
+}
+
+export function useDeleteTodoItem() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deleteTodoItem(id);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["todoItems"] }),
+  });
+}
+
+// ── User Profiles ──────────────────────────────────────────────────────────
+
+export function useUserProfiles() {
+  const { actor, isFetching } = useActor();
+  return useQuery<UserProfileDTO[]>({
+    queryKey: ["userProfiles"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listAllUserProfiles();
+    },
+    enabled: !!actor && !isFetching,
   });
 }

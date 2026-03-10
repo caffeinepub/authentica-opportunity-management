@@ -49,6 +49,15 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
+export const CalendarItem = IDL.Record({
+  'id' : IDL.Nat,
+  'title' : IDL.Text,
+  'timeLabel' : IDL.Text,
+  'createdBy' : IDL.Text,
+  'opportunityId' : IDL.Opt(IDL.Nat),
+  'notes' : IDL.Text,
+  'dateTimestamp' : IDL.Int,
+});
 export const Opportunity = IDL.Record({
   'id' : IDL.Nat,
   'closeDate' : IDL.Int,
@@ -58,7 +67,18 @@ export const Opportunity = IDL.Record({
   'summary' : IDL.Text,
   'stage' : IDL.Text,
 });
+export const TodoItem = IDL.Record({
+  'id' : IDL.Nat,
+  'title' : IDL.Text,
+  'assignedTo' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'stage' : IDL.Text,
+});
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const UserProfileDTO = IDL.Record({
+  'principal' : IDL.Principal,
+  'name' : IDL.Text,
+});
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -105,14 +125,22 @@ export const idlService = IDL.Service({
       [],
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'createCalendarItem' : IDL.Func(
+      [IDL.Text, IDL.Int, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Text],
+      [CalendarItem],
+      [],
+    ),
   'createOpportunity' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
       [Opportunity],
       [],
     ),
+  'createTodoItem' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [TodoItem], []),
+  'deleteCalendarItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'deleteComment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'deleteFileRecord' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'deleteOpportunity' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'deleteTodoItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getContact' : IDL.Func([IDL.Nat], [IDL.Opt(Contact)], ['query']),
@@ -125,6 +153,8 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'linkContactToOpportunity' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
   'listAllContacts' : IDL.Func([], [IDL.Vec(Contact)], ['query']),
+  'listAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfileDTO)], ['query']),
+  'listCalendarItems' : IDL.Func([], [IDL.Vec(CalendarItem)], ['query']),
   'listComments' : IDL.Func([IDL.Nat], [IDL.Vec(Comment)], ['query']),
   'listContactsByOpportunity' : IDL.Func(
       [IDL.Nat],
@@ -133,6 +163,7 @@ export const idlService = IDL.Service({
     ),
   'listFileRecords' : IDL.Func([IDL.Nat], [IDL.Vec(FileRecord)], ['query']),
   'listOpportunities' : IDL.Func([], [IDL.Vec(Opportunity)], ['query']),
+  'listTodoItems' : IDL.Func([], [IDL.Vec(TodoItem)], ['query']),
   'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'unlinkContactFromOpportunity' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
@@ -149,6 +180,11 @@ export const idlService = IDL.Service({
   'updateOpportunity' : IDL.Func(
       [IDL.Nat, IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
       [IDL.Opt(Opportunity)],
+      [],
+    ),
+  'updateTodoItem' : IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Opt(TodoItem)],
       [],
     ),
 });
@@ -197,6 +233,15 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
+  const CalendarItem = IDL.Record({
+    'id' : IDL.Nat,
+    'title' : IDL.Text,
+    'timeLabel' : IDL.Text,
+    'createdBy' : IDL.Text,
+    'opportunityId' : IDL.Opt(IDL.Nat),
+    'notes' : IDL.Text,
+    'dateTimestamp' : IDL.Int,
+  });
   const Opportunity = IDL.Record({
     'id' : IDL.Nat,
     'closeDate' : IDL.Int,
@@ -206,7 +251,18 @@ export const idlFactory = ({ IDL }) => {
     'summary' : IDL.Text,
     'stage' : IDL.Text,
   });
+  const TodoItem = IDL.Record({
+    'id' : IDL.Nat,
+    'title' : IDL.Text,
+    'assignedTo' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'stage' : IDL.Text,
+  });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const UserProfileDTO = IDL.Record({
+    'principal' : IDL.Principal,
+    'name' : IDL.Text,
+  });
   
   return IDL.Service({
     '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -253,14 +309,22 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'createCalendarItem' : IDL.Func(
+        [IDL.Text, IDL.Int, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Text],
+        [CalendarItem],
+        [],
+      ),
     'createOpportunity' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
         [Opportunity],
         [],
       ),
+    'createTodoItem' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [TodoItem], []),
+    'deleteCalendarItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'deleteComment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'deleteFileRecord' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'deleteOpportunity' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'deleteTodoItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getContact' : IDL.Func([IDL.Nat], [IDL.Opt(Contact)], ['query']),
@@ -273,6 +337,8 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'linkContactToOpportunity' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
     'listAllContacts' : IDL.Func([], [IDL.Vec(Contact)], ['query']),
+    'listAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfileDTO)], ['query']),
+    'listCalendarItems' : IDL.Func([], [IDL.Vec(CalendarItem)], ['query']),
     'listComments' : IDL.Func([IDL.Nat], [IDL.Vec(Comment)], ['query']),
     'listContactsByOpportunity' : IDL.Func(
         [IDL.Nat],
@@ -281,6 +347,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'listFileRecords' : IDL.Func([IDL.Nat], [IDL.Vec(FileRecord)], ['query']),
     'listOpportunities' : IDL.Func([], [IDL.Vec(Opportunity)], ['query']),
+    'listTodoItems' : IDL.Func([], [IDL.Vec(TodoItem)], ['query']),
     'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'unlinkContactFromOpportunity' : IDL.Func(
@@ -301,6 +368,11 @@ export const idlFactory = ({ IDL }) => {
     'updateOpportunity' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
         [IDL.Opt(Opportunity)],
+        [],
+      ),
+    'updateTodoItem' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Opt(TodoItem)],
         [],
       ),
   });
