@@ -95,15 +95,23 @@ function FileRow({
     try {
       const url = await resolveBlobUrl(file.blobId);
       const downloadName = buildDownloadName(file.displayName, file.fileType);
+
+      // Fetch content and create a same-origin object URL so `download` attribute is respected
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
       const a = document.createElement("a");
-      a.href = url;
+      a.href = objectUrl;
       a.download = downloadName;
-      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch {
-      toast.error("Failed to get file URL");
+      toast.error("Failed to download file");
     }
   };
 
