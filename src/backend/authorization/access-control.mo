@@ -14,6 +14,8 @@ module {
     userRoles : Map.Map<Principal, UserRole>;
   };
 
+  let MAX_USERS : Nat = 3;
+
   public func initState() : AccessControlState {
     {
       var adminAssigned = false;
@@ -21,12 +23,16 @@ module {
     };
   };
 
-  // First principal that calls this function becomes admin, all other principals become users.
+  // First principal that calls this function becomes admin, all others become users.
+  // Maximum of MAX_USERS total principals allowed.
   public func initialize(state : AccessControlState, caller : Principal, adminToken : Text, userProvidedToken : Text) {
     if (caller.isAnonymous()) { return };
     switch (state.userRoles.get(caller)) {
-      case (?_) {};
+      case (?_) {}; // already registered
       case (null) {
+        if (state.userRoles.size() >= MAX_USERS) {
+          Runtime.trap("Maximum number of users (" # debug_show(MAX_USERS) # ") reached");
+        };
         if (not state.adminAssigned and userProvidedToken == adminToken) {
           state.userRoles.add(caller, #admin);
           state.adminAssigned := true;

@@ -33,6 +33,42 @@ import {
   useUpdateFileRecord,
 } from "../hooks/useQueries";
 
+// Derive a file extension from a MIME type
+function extFromMime(mime: string): string {
+  const map: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "image/svg+xml": ".svg",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "application/pdf": ".pdf",
+    "text/plain": ".txt",
+    "text/csv": ".csv",
+    "application/zip": ".zip",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      ".docx",
+    "application/vnd.ms-excel": ".xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+      ".xlsx",
+    "application/vnd.ms-powerpoint": ".ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      ".pptx",
+  };
+  return map[mime] ?? "";
+}
+
+// Build a download filename: use displayName and append ext if missing
+function buildDownloadName(displayName: string, fileType: string): string {
+  const ext = extFromMime(fileType);
+  if (!ext) return displayName;
+  // Check if displayName already ends with the extension (case-insensitive)
+  if (displayName.toLowerCase().endsWith(ext.toLowerCase())) return displayName;
+  return displayName + ext;
+}
+
 function getFileIcon(fileType: string) {
   if (fileType.startsWith("image/"))
     return <FileImage className="w-4 h-4 text-blue-500" />;
@@ -51,7 +87,6 @@ function FileRow({
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(file.displayName);
   const [folder, setFolder] = useState(file.folder);
-  const [blobUrl, setBlobUrl] = useState("");
   const { resolveBlobUrl } = useBlobStorage();
   const updateFile = useUpdateFileRecord();
   const deleteFile = useDeleteFileRecord();
@@ -59,8 +94,14 @@ function FileRow({
   const handleClickLink = async () => {
     try {
       const url = await resolveBlobUrl(file.blobId);
-      setBlobUrl(url);
-      window.open(url, "_blank");
+      const downloadName = buildDownloadName(file.displayName, file.fileType);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = downloadName;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch {
       toast.error("Failed to get file URL");
     }
@@ -89,9 +130,6 @@ function FileRow({
       toast.error("Failed to delete file");
     }
   };
-
-  // unused but kept for future use
-  void blobUrl;
 
   return (
     <div
