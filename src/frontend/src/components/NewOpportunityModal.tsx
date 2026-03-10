@@ -62,7 +62,8 @@ export default function NewOpportunityModal() {
       const valueNum = value
         ? BigInt(Math.round(Number.parseFloat(value)))
         : BigInt(0);
-      const closeDateMs = BigInt(new Date(closeDate).getTime());
+      // Parse as UTC midnight so display (also UTC) is consistent
+      const closeDateMs = BigInt(new Date(`${closeDate}T00:00:00Z`).getTime());
       await createOpp.mutateAsync({
         name: name.trim(),
         stage,

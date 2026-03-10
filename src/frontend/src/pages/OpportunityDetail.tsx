@@ -86,6 +86,7 @@ export default function OpportunityDetail() {
     setEditName(opportunity.name);
     setEditStage(opportunity.stage);
     setEditValue(Number(opportunity.value).toString());
+    // Extract date in UTC to avoid timezone shifting the displayed value
     setEditCloseDate(
       new Date(Number(opportunity.closeDate)).toISOString().split("T")[0],
     );
@@ -106,7 +107,10 @@ export default function OpportunityDetail() {
       const valueNum = editValue
         ? BigInt(Math.round(Number.parseFloat(editValue)))
         : BigInt(0);
-      const closeDateMs = BigInt(new Date(editCloseDate).getTime());
+      // Parse date as UTC midnight to match how it was originally stored
+      const closeDateMs = BigInt(
+        new Date(`${editCloseDate}T00:00:00Z`).getTime(),
+      );
       await updateOpp.mutateAsync({
         id: opportunity.id,
         name: editName.trim(),
@@ -204,7 +208,10 @@ export default function OpportunityDetail() {
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
               Closes{" "}
-              {new Date(Number(opportunity.closeDate)).toLocaleDateString()}
+              {new Date(Number(opportunity.closeDate)).toLocaleDateString(
+                "en-US",
+                { timeZone: "UTC" },
+              )}
             </span>
           </div>
         </div>

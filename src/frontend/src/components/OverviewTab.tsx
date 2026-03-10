@@ -25,6 +25,11 @@ function initials(name: string) {
     .slice(0, 2);
 }
 
+// ICP Time.now() returns nanoseconds; convert to ms for JS Date
+function nanosToMs(ns: bigint): number {
+  return Number(ns / 1_000_000n);
+}
+
 export default function OverviewTab({
   opportunity,
 }: { opportunity: Opportunity }) {
@@ -154,7 +159,7 @@ export default function OverviewTab({
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
                         {new Date(
-                          Number(comment.createdAt),
+                          nanosToMs(comment.createdAt),
                         ).toLocaleDateString()}
                       </span>
                       <button

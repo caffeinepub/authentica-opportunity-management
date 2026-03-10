@@ -187,7 +187,10 @@ export default function Dashboard() {
                       <Calendar className="w-3.5 h-3.5 shrink-0" />
                       <span>
                         Closes{" "}
-                        {new Date(Number(opp.closeDate)).toLocaleDateString()}
+                        {new Date(Number(opp.closeDate)).toLocaleDateString(
+                          "en-US",
+                          { timeZone: "UTC" },
+                        )}
                       </span>
                     </div>
                   </div>
