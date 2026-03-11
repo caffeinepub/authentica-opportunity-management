@@ -35,14 +35,18 @@ function getNextTwoWorkWeeks(): Date[] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  let current = new Date(today);
-  // Start from Monday of current week or next Monday if weekend
-  const dayOfWeek = current.getDay();
-  if (dayOfWeek === 0)
-    current.setDate(current.getDate() + 1); // Sunday -> Monday
-  else if (dayOfWeek === 6) current.setDate(current.getDate() + 2); // Saturday -> Monday
+  // Find Monday of the current week
+  const current = new Date(today);
+  const dayOfWeek = current.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  if (dayOfWeek === 0) {
+    current.setDate(current.getDate() + 1); // Sunday -> next Monday
+  } else if (dayOfWeek === 6) {
+    current.setDate(current.getDate() + 2); // Saturday -> next Monday
+  } else {
+    current.setDate(current.getDate() - (dayOfWeek - 1)); // rewind to Monday
+  }
 
-  // Collect 10 work days (2 weeks)
+  // Collect 10 work days (Mon-Fri for 2 weeks)
   while (days.length < 10) {
     const d = new Date(current);
     const dow = d.getDay();
