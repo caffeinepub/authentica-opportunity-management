@@ -103,6 +103,12 @@ export default function AdminPage() {
     if (!adminActor) return;
     setLoading(true);
     try {
+      // Always restore caller role from stable storage before checking admin status
+      try {
+        await adminActor.restoreCallerRole();
+      } catch {
+        /* ignore */
+      }
       const [adminStatus, userList, currentMax, profiles, opps] =
         await Promise.all([
           adminActor.isCallerAdmin() as Promise<boolean>,
@@ -140,6 +146,12 @@ export default function AdminPage() {
     const key = principal.toString();
     setRemovingUser(key);
     try {
+      // Restore admin role before attempting removal
+      try {
+        await adminActor.restoreCallerRole();
+      } catch {
+        /* ignore */
+      }
       if (adminActor.removeUser) {
         await adminActor.removeUser(principal);
       }

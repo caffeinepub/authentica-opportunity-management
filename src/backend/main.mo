@@ -499,6 +499,28 @@ actor {
     };
   };
 
+
+  // Helper: restore caller role from stable storage so admin checks work across upgrades
+  func _restoreCallerRoleFromStable(caller : Principal) {
+    switch (stableUserRoles.get(caller)) {
+      case (?roleText) {
+        let role = switch (roleText) {
+          case ("admin") { #admin };
+          case ("confidential") { #user };
+          case ("user") { #user };
+          case (_) { #guest };
+        };
+        accessControlState.userRoles.add(caller, role);
+      };
+      case (null) {
+        if (userProfiles.containsKey(caller)) {
+          accessControlState.userRoles.add(caller, #admin);
+          stableUserRoles.add(caller, "admin");
+        };
+      };
+    };
+  };
+
   // Helper: check if caller can access a confidential file
   func canAccessFile(caller : Principal, fileId : Nat) : Bool {
     if (AccessControl.isAdmin(accessControlState, caller)) { return true };
@@ -518,6 +540,7 @@ actor {
 
   // Admin: Set max users limit (admin only)
   public shared ({ caller }) func setMaxUsers(limit : Nat) : async () {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can set user limit");
     };
@@ -526,6 +549,7 @@ actor {
 
   // Admin: List all users with their roles
   public shared ({ caller }) func listAllUsersWithRoles() : async [UserWithRole] {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can list users with roles");
     };
@@ -546,6 +570,7 @@ actor {
 
   // Admin: Remove a user (admin only)
   public shared ({ caller }) func removeUser(user : Principal) : async () {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can remove users");
     };
@@ -561,6 +586,7 @@ actor {
 
   // Admin: Promote a user to admin role
   public shared ({ caller }) func makeAdmin(user : Principal) : async () {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can make other admins");
     };
@@ -571,6 +597,7 @@ actor {
 
   // Admin: Assign confidential role to a user (can view confidential files)
   public shared ({ caller }) func assignConfidentialRole(user : Principal) : async () {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can assign confidential role");
     };
@@ -591,6 +618,7 @@ actor {
 
   // Admin: Demote a user to regular user role (removes confidential access)
   public shared ({ caller }) func demoteToUser(user : Principal) : async () {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can change user roles");
     };
@@ -604,6 +632,7 @@ actor {
 
   // Admin: Mark/unmark a file as confidential
   public shared ({ caller }) func setFileConfidential(fileId : Nat, confidential : Bool) : async Bool {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can set file confidentiality");
     };
@@ -626,6 +655,7 @@ actor {
 
   // Admin: Grant a user access to a confidential file
   public shared ({ caller }) func grantFileAccess(fileId : Nat, user : Principal) : async Bool {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can grant file access");
     };
@@ -642,6 +672,7 @@ actor {
 
   // Admin: Revoke a user's access to a confidential file
   public shared ({ caller }) func revokeFileAccess(fileId : Nat, user : Principal) : async Bool {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can revoke file access");
     };
@@ -657,6 +688,7 @@ actor {
 
   // Admin: List principals with access to a specific file
   public query ({ caller }) func listFilePermissions(fileId : Nat) : async [Principal] {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can list file permissions");
     };
@@ -668,6 +700,7 @@ actor {
 
   // Admin: List all file records across all opportunities (for permissions management UI)
   public query ({ caller }) func listAllFileRecordsAdmin() : async [FileRecord] {
+    _restoreCallerRoleFromStable(caller);
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can list all file records");
     };
