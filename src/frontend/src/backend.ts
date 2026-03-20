@@ -209,6 +209,7 @@ export interface backendInterface {
     updateContact(id: bigint, name: string, email: string, phone: string, title: string): Promise<Contact | null>;
     updateFileRecord(id: bigint, displayName: string, folder: string): Promise<FileRecord | null>;
     updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity | null>;
+    restoreCallerRole(): Promise<string>;
     updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem | null>;
 }
 import type { CalendarItem as _CalendarItem, Contact as _Contact, FileRecord as _FileRecord, Opportunity as _Opportunity, TodoItem as _TodoItem, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
@@ -842,6 +843,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.demoteToUser(arg0);
             return result;
+        }
+    }
+    async restoreCallerRole(): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).restoreCallerRole();
+                return result as string;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).restoreCallerRole();
+            return result as string;
         }
     }
 }

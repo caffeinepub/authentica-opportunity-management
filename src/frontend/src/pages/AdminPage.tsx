@@ -164,19 +164,32 @@ export default function AdminPage() {
     const key = principal.toString();
     setRoleActionUser(key);
     try {
+      let newRole: string;
       if (action === "makeAdmin") {
         await makeAdminMutation.mutateAsync(principal);
+        newRole = "admin";
         toast.success("User promoted to admin");
       } else if (action === "grantConfidential") {
         await assignConfidentialMutation.mutateAsync(principal);
+        newRole = "confidential";
         toast.success("Confidential role granted");
       } else {
         await demoteToUserMutation.mutateAsync(principal);
+        newRole = "user";
         toast.success("User demoted to standard role");
       }
-      await loadData();
-    } catch {
-      toast.error("Failed to update role");
+      // Optimistically update local state so UI reflects change immediately
+      // (ICP query calls can return stale data right after an update call)
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.principal.toString() === key ? { ...u, role: newRole } : u,
+        ),
+      );
+      // Also reload in background to confirm server state
+      loadData().catch(() => {});
+    } catch (err) {
+      console.error("Role action failed:", err);
+      toast.error("Failed to update role. You may not have admin privileges.");
     } finally {
       setRoleActionUser(null);
     }

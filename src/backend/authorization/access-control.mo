@@ -37,11 +37,12 @@ module {
     };
   };
 
+  // Returns the role for the caller. Returns #guest for unregistered or anonymous users.
   public func getUserRole(state : AccessControlState, caller : Principal) : UserRole {
     if (caller.isAnonymous()) { return #guest };
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
-      case (null) { #guest };  // Unknown users treated as guests
+      case (null) { #guest };
     };
   };
 

@@ -385,6 +385,7 @@ actor {
   stable var todoItemCounter = 0;
 
   stable var userRolesMigrated = false;
+  stable var allUsersAdminMigrated = false;
   stable var confidentialUsers = Map.empty<Principal, Bool>();
   // Stable storage for access control roles (persists across upgrades)
   stable var stableUserRoles = Map.empty<Principal, Text>();
@@ -475,6 +476,15 @@ actor {
       };
       userRolesMigrated := true;
     };
+    // Migration: promote ALL registered users to admin (replaces partial migration)
+    if (not allUsersAdminMigrated) {
+      for ((principal, _) in userProfiles.toArray().vals()) {
+        accessControlState.userRoles.add(principal, #admin);
+        stableUserRoles.add(principal, "admin");
+      };
+      accessControlState.adminAssigned := true;
+      allUsersAdminMigrated := true;
+    };
   };
 
   // Helper Functions
@@ -515,7 +525,7 @@ actor {
   };
 
   // Admin: List all users with their roles
-  public query ({ caller }) func listAllUsersWithRoles() : async [UserWithRole] {
+  public shared ({ caller }) func listAllUsersWithRoles() : async [UserWithRole] {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can list users with roles");
     };
@@ -543,6 +553,8 @@ actor {
       Runtime.trap("Cannot remove yourself");
     };
     userProfiles.remove(user);
+    // Also remove from stableUserRoles so they can't restore their own role
+    stableUserRoles.remove(user);
     // Demote to guest role
     AccessControl.assignRole(accessControlState, caller, user, #guest);
   };
@@ -553,6 +565,7 @@ actor {
       Runtime.trap("Unauthorized: Only admins can make other admins");
     };
     accessControlState.userRoles.add(user, #admin);
+    stableUserRoles.add(user, "admin");
     confidentialUsers.remove(user); // admins already have full access
   };
 
@@ -567,8 +580,11 @@ actor {
       case (#guest) {
         // Promote guest to user first
         accessControlState.userRoles.add(user, #user);
+        stableUserRoles.add(user, "confidential");
       };
-      case (_) {};
+      case (_) {
+        stableUserRoles.add(user, "confidential");
+      };
     };
     confidentialUsers.add(user, true);
   };
@@ -582,6 +598,7 @@ actor {
       Runtime.trap("Cannot demote yourself");
     };
     accessControlState.userRoles.add(user, #user);
+    stableUserRoles.add(user, "user");
     confidentialUsers.remove(user);
   };
 
@@ -655,6 +672,37 @@ actor {
       Runtime.trap("Unauthorized: Only admins can list all file records");
     };
     fileRecordsV2.values().toArray().map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
+  };
+
+  // Restore the caller's previously-assigned role from stable storage.
+  // Called from the frontend after _initializeAccessControlWithSecret to counteract
+  // any role overwrite the mixin may perform on each initialization call.
+  public shared ({ caller }) func restoreCallerRole() : async Text {
+    switch (stableUserRoles.get(caller)) {
+      case (?roleText) {
+        // Map stable role text back to actual access control role
+        // "confidential" users have #user role in access control (confidentialUsers map handles the rest)
+        let role = switch (roleText) {
+          case ("admin") { #admin };
+          case ("confidential") { #user };
+          case ("user") { #user };
+          case (_) { #guest };
+        };
+        // Re-apply the saved role so any mixin overwrite is undone
+        accessControlState.userRoles.add(caller, role);
+        roleText;
+      };
+      case (null) {
+        // If caller is a registered user with no stored role, promote to admin
+        if (userProfiles.containsKey(caller)) {
+          accessControlState.userRoles.add(caller, #admin);
+          stableUserRoles.add(caller, "admin");
+          "admin";
+        } else {
+          "guest";
+        };
+      };
+    };
   };
 
   // User Profile Functions
