@@ -227,8 +227,8 @@ actor {
     };
   };
 
-  // FileRecord Types
-  public type FileRecord = {
+  // FileRecord V1 -- original shape without isConfidential.
+  type InternalFileRecordV1 = {
     id : Nat;
     opportunityId : Nat;
     displayName : Text;
@@ -239,20 +239,32 @@ actor {
     uploadedBy : Text;
   };
 
-  module FileRecord {
-    func toInternal(ext : FileRecord) : InternalFileRecord {
-      {
-        id = ext.id;
-        opportunityId = ext.opportunityId;
-        displayName = ext.displayName;
-        folder = ext.folder;
-        blobId = ext.blobId;
-        fileType = ext.fileType;
-        uploadedAt = ext.uploadedAt;
-        uploadedBy = ext.uploadedBy;
-      };
-    };
+  // FileRecord V2 -- adds isConfidential field.
+  public type InternalFileRecord = {
+    id : Nat;
+    opportunityId : Nat;
+    displayName : Text;
+    folder : Text;
+    blobId : Text;
+    fileType : Text;
+    uploadedAt : Int;
+    uploadedBy : Text;
+    isConfidential : Bool;
+  };
 
+  public type FileRecord = {
+    id : Nat;
+    opportunityId : Nat;
+    displayName : Text;
+    folder : Text;
+    blobId : Text;
+    fileType : Text;
+    uploadedAt : Int;
+    uploadedBy : Text;
+    isConfidential : Bool;
+  };
+
+  module FileRecord {
     public func fromInternal(internal : InternalFileRecord) : FileRecord {
       {
         id = internal.id;
@@ -263,32 +275,7 @@ actor {
         fileType = internal.fileType;
         uploadedAt = internal.uploadedAt;
         uploadedBy = internal.uploadedBy;
-      };
-    };
-  };
-
-  public type InternalFileRecord = {
-    id : Nat;
-    opportunityId : Nat;
-    displayName : Text;
-    folder : Text;
-    blobId : Text;
-    fileType : Text;
-    uploadedAt : Int;
-    uploadedBy : Text;
-  };
-
-  module InternalFileRecord {
-    func fromInternal(internal : InternalFileRecord) : FileRecord {
-      {
-        id = internal.id;
-        opportunityId = internal.opportunityId;
-        displayName = internal.displayName;
-        folder = internal.folder;
-        blobId = internal.blobId;
-        fileType = internal.fileType;
-        uploadedAt = internal.uploadedAt;
-        uploadedBy = internal.uploadedBy;
+        isConfidential = internal.isConfidential;
       };
     };
   };
@@ -301,6 +288,13 @@ actor {
   public type UserProfileDTO = {
     principal : Principal;
     name : Text;
+  };
+
+  // Admin: User with role info
+  public type UserWithRole = {
+    principal : Principal;
+    name : Text;
+    role : Text;
   };
 
   // Calendar Item Type
@@ -320,43 +314,352 @@ actor {
     #done;
   };
 
-  public type TodoItem = {
+  // TodoItem V1 -- original shape (no opportunityId)
+  type TodoItemV1 = {
     id : Nat;
     title : Text;
-    assignedTo : Text; // Display name of assignee
-    stage : Text; // #todo | #inProgress | #done
+    assignedTo : Text;
+    stage : Text;
     createdAt : Int;
   };
 
-  // Persistent Storage
-  let opportunities = Map.empty<Nat, InternalOpportunity>();
-  let contacts = Map.empty<Nat, InternalContact>();
-  let comments = Map.empty<Nat, InternalComment>();
-  let fileRecords = Map.empty<Nat, InternalFileRecord>();
-  let userProfiles = Map.empty<Principal, UserProfile>();
-  let calendarItems = Map.empty<Nat, CalendarItem>();
-  let todoItems = Map.empty<Nat, TodoItem>();
-  let contactLinks = Map.empty<Nat, [Nat]>();
+  // TodoItem V2 -- added opportunityId
+  type TodoItemV2 = {
+    id : Nat;
+    title : Text;
+    assignedTo : Text;
+    stage : Text;
+    createdAt : Int;
+    opportunityId : ?Nat;
+  };
 
-  // ID Counters
-  var opportunityCounter = 0;
-  var contactCounter = 0;
-  var commentCounter = 0;
-  var fileRecordCounter = 0;
-  var calendarItemCounter = 0;
-  var todoItemCounter = 0;
+  // TodoItem V3 (current) -- adds priority field
+  public type TodoItem = {
+    id : Nat;
+    title : Text;
+    assignedTo : Text;
+    stage : Text;
+    createdAt : Int;
+    opportunityId : ?Nat;
+    priority : Text; // "low" | "medium" | "high"
+  };
+
+  // File permissions entry
+  public type FilePermissionEntry = {
+    fileId : Nat;
+    allowedUsers : [Principal];
+  };
+
+  // Persistent Storage - stable vars survive canister upgrades
+  stable var opportunities = Map.empty<Nat, InternalOpportunity>();
+  stable var contacts = Map.empty<Nat, InternalContact>();
+  stable var comments = Map.empty<Nat, InternalComment>();
+  // V1 stable var kept for migration -- do NOT use at runtime
+  stable var fileRecords = Map.empty<Nat, InternalFileRecordV1>();
+  // V2 stable var -- all runtime code uses this
+  stable var fileRecordsV2 = Map.empty<Nat, InternalFileRecord>();
+  stable var fileRecordsMigrated = false;
+  // Per-file list of principals allowed to see confidential files
+  stable var filePermissions = Map.empty<Nat, [Principal]>();
+  stable var userProfiles = Map.empty<Principal, UserProfile>();
+  stable var calendarItems = Map.empty<Nat, CalendarItem>();
+  stable var contactLinks = Map.empty<Nat, [Nat]>();
+
+  // TodoItem migration stable vars
+  stable var todoItems = Map.empty<Nat, TodoItemV1>();
+  stable var todoItemsV2 = Map.empty<Nat, TodoItemV2>();
+  stable var todoItemsMigrated = false;
+  // V3 adds priority
+  stable var todoItemsV3 = Map.empty<Nat, TodoItem>();
+  stable var todoItemsV3Migrated = false;
+
+  // Admin settings
+  stable var maxUsers : Nat = 3;
+
+  // ID Counters - stable so they don't reset on upgrade
+  stable var opportunityCounter = 0;
+  stable var contactCounter = 0;
+  stable var commentCounter = 0;
+  stable var fileRecordCounter = 0;
+  stable var calendarItemCounter = 0;
+  stable var todoItemCounter = 0;
+
+  stable var userRolesMigrated = false;
+  stable var confidentialUsers = Map.empty<Principal, Bool>();
+  // Stable storage for access control roles (persists across upgrades)
+  stable var stableUserRoles = Map.empty<Principal, Text>();
+  stable var stableAdminAssigned = false;
+
+  // Save access control roles before upgrade
+  system func preupgrade() {
+    stableUserRoles := Map.empty<Principal, Text>();
+    for ((principal, role) in accessControlState.userRoles.toArray().vals()) {
+      let roleText = switch (role) {
+        case (#admin) { "admin" };
+        case (#user) { "user" };
+        case (_) { "guest" };
+      };
+      stableUserRoles.add(principal, roleText);
+    };
+    stableAdminAssigned := accessControlState.adminAssigned;
+  };
+
+  // Run migrations on upgrade
+  system func postupgrade() {
+    // Restore access control roles from stable storage
+    for ((principal, roleText) in stableUserRoles.toArray().vals()) {
+      let role = switch (roleText) {
+        case ("admin") { #admin };
+        case ("user") { #user };
+        case (_) { #guest };
+      };
+      accessControlState.userRoles.add(principal, role);
+    };
+    accessControlState.adminAssigned := stableAdminAssigned;
+
+    // Migrate TodoItem V1 -> V2
+    if (not todoItemsMigrated) {
+      for ((k, v) in todoItems.toArray().vals()) {
+        todoItemsV2.add(k, {
+          id = v.id;
+          title = v.title;
+          assignedTo = v.assignedTo;
+          stage = v.stage;
+          createdAt = v.createdAt;
+          opportunityId = null;
+        });
+      };
+      todoItemsMigrated := true;
+    };
+    // Migrate TodoItem V2 -> V3 (add priority = "medium" for existing items)
+    if (not todoItemsV3Migrated) {
+      for ((k, v) in todoItemsV2.toArray().vals()) {
+        todoItemsV3.add(k, {
+          id = v.id;
+          title = v.title;
+          assignedTo = v.assignedTo;
+          stage = v.stage;
+          createdAt = v.createdAt;
+          opportunityId = v.opportunityId;
+          priority = "medium";
+        });
+      };
+      todoItemsV3Migrated := true;
+    };
+    // Migrate FileRecord V1 -> V2
+    if (not fileRecordsMigrated) {
+      for ((k, v) in fileRecords.toArray().vals()) {
+        fileRecordsV2.add(k, {
+          id = v.id;
+          opportunityId = v.opportunityId;
+          displayName = v.displayName;
+          folder = v.folder;
+          blobId = v.blobId;
+          fileType = v.fileType;
+          uploadedAt = v.uploadedAt;
+          uploadedBy = v.uploadedBy;
+          isConfidential = false;
+        });
+      };
+      fileRecordsMigrated := true;
+    };
+    // Migrate: promote all existing #user roles to #admin (one-time migration)
+    if (not userRolesMigrated) {
+      for ((principal, role) in accessControlState.userRoles.toArray().vals()) {
+        switch (role) {
+          case (#user) {
+            accessControlState.userRoles.add(principal, #admin);
+          };
+          case (_) {};
+        };
+      };
+      userRolesMigrated := true;
+    };
+  };
 
   // Helper Functions
   func ensureUserRegistered(caller : Principal) {
     if (not userProfiles.containsKey(caller)) {
+      // Enforce max users limit
+      if (userProfiles.size() >= maxUsers) {
+        Runtime.trap("User limit reached: maximum " # maxUsers.toText() # " users allowed");
+      };
       // Add default profile if not exists
       userProfiles.add(caller, { name = "" });
     };
   };
 
+  // Helper: check if caller can access a confidential file
+  func canAccessFile(caller : Principal, fileId : Nat) : Bool {
+    if (AccessControl.isAdmin(accessControlState, caller)) { return true };
+    if (confidentialUsers.containsKey(caller)) { return true };
+    switch (filePermissions.get(fileId)) {
+      case (null) { false };
+      case (?allowed) {
+        allowed.find(func(p : Principal) : Bool { p == caller }) != null
+      };
+    };
+  };
+
+  // Admin: Get max users limit
+  public query func getMaxUsers() : async Nat {
+    maxUsers;
+  };
+
+  // Admin: Set max users limit (admin only)
+  public shared ({ caller }) func setMaxUsers(limit : Nat) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can set user limit");
+    };
+    maxUsers := limit;
+  };
+
+  // Admin: List all users with their roles
+  public query ({ caller }) func listAllUsersWithRoles() : async [UserWithRole] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can list users with roles");
+    };
+    userProfiles.toArray().map<(Principal, UserProfile), UserWithRole>(
+      func((principal, profile)) {
+        let baseRole = switch (AccessControl.getUserRole(accessControlState, principal)) {
+          case (#admin) { "admin" };
+          case (#user) {
+            if (confidentialUsers.containsKey(principal)) { "confidential" } else { "user" };
+          };
+          case (#guest) { "guest" };
+        };
+        let role = baseRole;
+        { principal; name = profile.name; role };
+      }
+    );
+  };
+
+  // Admin: Remove a user (admin only)
+  public shared ({ caller }) func removeUser(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can remove users");
+    };
+    if (caller == user) {
+      Runtime.trap("Cannot remove yourself");
+    };
+    userProfiles.remove(user);
+    // Demote to guest role
+    AccessControl.assignRole(accessControlState, caller, user, #guest);
+  };
+
+  // Admin: Promote a user to admin role
+  public shared ({ caller }) func makeAdmin(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can make other admins");
+    };
+    accessControlState.userRoles.add(user, #admin);
+    confidentialUsers.remove(user); // admins already have full access
+  };
+
+  // Admin: Assign confidential role to a user (can view confidential files)
+  public shared ({ caller }) func assignConfidentialRole(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can assign confidential role");
+    };
+    // Ensure user has at least #user role so they can write
+    let currentRole = AccessControl.getUserRole(accessControlState, user);
+    switch (currentRole) {
+      case (#guest) {
+        // Promote guest to user first
+        accessControlState.userRoles.add(user, #user);
+      };
+      case (_) {};
+    };
+    confidentialUsers.add(user, true);
+  };
+
+  // Admin: Demote a user to regular user role (removes confidential access)
+  public shared ({ caller }) func demoteToUser(user : Principal) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can change user roles");
+    };
+    if (caller == user) {
+      Runtime.trap("Cannot demote yourself");
+    };
+    accessControlState.userRoles.add(user, #user);
+    confidentialUsers.remove(user);
+  };
+
+  // Admin: Mark/unmark a file as confidential
+  public shared ({ caller }) func setFileConfidential(fileId : Nat, confidential : Bool) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can set file confidentiality");
+    };
+    switch (fileRecordsV2.get(fileId)) {
+      case (null) { false };
+      case (?existing) {
+        let updated : InternalFileRecord = {
+          existing with
+          isConfidential = confidential;
+        };
+        fileRecordsV2.add(fileId, updated);
+        // If marking as not confidential, clear permissions
+        if (not confidential) {
+          filePermissions.remove(fileId);
+        };
+        true;
+      };
+    };
+  };
+
+  // Admin: Grant a user access to a confidential file
+  public shared ({ caller }) func grantFileAccess(fileId : Nat, user : Principal) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can grant file access");
+    };
+    let current = switch (filePermissions.get(fileId)) {
+      case (null) { [] };
+      case (?list) { list };
+    };
+    // Only add if not already present
+    if (current.find(func(p : Principal) : Bool { p == user }) == null) {
+      filePermissions.add(fileId, current.concat([user]));
+    };
+    true;
+  };
+
+  // Admin: Revoke a user's access to a confidential file
+  public shared ({ caller }) func revokeFileAccess(fileId : Nat, user : Principal) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can revoke file access");
+    };
+    switch (filePermissions.get(fileId)) {
+      case (null) { true };
+      case (?list) {
+        let filtered = list.filter(func(p : Principal) : Bool { p != user });
+        filePermissions.add(fileId, filtered);
+        true;
+      };
+    };
+  };
+
+  // Admin: List principals with access to a specific file
+  public query ({ caller }) func listFilePermissions(fileId : Nat) : async [Principal] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can list file permissions");
+    };
+    switch (filePermissions.get(fileId)) {
+      case (null) { [] };
+      case (?list) { list };
+    };
+  };
+
+  // Admin: List all file records across all opportunities (for permissions management UI)
+  public query ({ caller }) func listAllFileRecordsAdmin() : async [FileRecord] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can list all file records");
+    };
+    fileRecordsV2.values().toArray().map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
+  };
+
   // User Profile Functions
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
     };
     userProfiles.get(caller);
@@ -378,7 +681,7 @@ actor {
   };
 
   public query ({ caller }) func listAllUserProfiles() : async [UserProfileDTO] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list user profiles");
     };
     userProfiles.toArray().map<(Principal, UserProfile), UserProfileDTO>(
@@ -453,7 +756,7 @@ actor {
   };
 
   public query ({ caller }) func getOpportunity(id : Nat) : async ?Opportunity {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can view opportunities");
     };
 
@@ -464,7 +767,7 @@ actor {
   };
 
   public query ({ caller }) func listOpportunities() : async [Opportunity] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list opportunities");
     };
 
@@ -552,7 +855,7 @@ actor {
   };
 
   public query ({ caller }) func listAllContacts() : async [Contact] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list contacts");
     };
 
@@ -560,7 +863,7 @@ actor {
   };
 
   public query ({ caller }) func listContactsByOpportunity(opportunityId : Nat) : async [Contact] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list contacts");
     };
 
@@ -607,7 +910,7 @@ actor {
   };
 
   public query ({ caller }) func getContact(id : Nat) : async ?Contact {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can get contacts");
     };
 
@@ -655,14 +958,14 @@ actor {
   };
 
   public query ({ caller }) func listComments(opportunityId : Nat) : async [Comment] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list comments");
     };
 
     comments.values().toArray().filter(func(c) { c.opportunityId == opportunityId }).map<InternalComment, Comment>(func(internal) { Comment.fromInternal(internal) });
   };
 
-  // FileRecord Functions
+  // FileRecord Functions (V2)
   public shared ({ caller }) func addFileRecord(opportunityId : Nat, displayName : Text, folder : Text, blobId : Text, fileType : Text, uploadedBy : Text) : async FileRecord {
     ensureUserRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -679,9 +982,10 @@ actor {
       fileType;
       uploadedAt = currentTime;
       uploadedBy;
+      isConfidential = false;
     };
 
-    fileRecords.add(fileRecord.id, fileRecord);
+    fileRecordsV2.add(fileRecord.id, fileRecord);
     fileRecordCounter += 1;
 
     FileRecord.fromInternal(fileRecord);
@@ -693,9 +997,10 @@ actor {
       Runtime.trap("Unauthorized: Only users can delete file records");
     };
 
-    switch (fileRecords.containsKey(id)) {
+    switch (fileRecordsV2.containsKey(id)) {
       case (true) {
-        fileRecords.remove(id);
+        fileRecordsV2.remove(id);
+        filePermissions.remove(id);
         true;
       };
       case (false) { false };
@@ -708,7 +1013,7 @@ actor {
       Runtime.trap("Unauthorized: Only users can update file records");
     };
 
-    switch (fileRecords.get(id)) {
+    switch (fileRecordsV2.get(id)) {
       case (null) { null };
       case (?existing) {
         let updated : InternalFileRecord = {
@@ -720,20 +1025,36 @@ actor {
           fileType = existing.fileType;
           uploadedAt = existing.uploadedAt;
           uploadedBy = existing.uploadedBy;
+          isConfidential = existing.isConfidential;
         };
 
-        fileRecords.add(id, updated);
+        fileRecordsV2.add(id, updated);
         ?FileRecord.fromInternal(existing);
       };
     };
   };
 
+  // listFileRecords: filters out confidential files unless caller has access
   public query ({ caller }) func listFileRecords(opportunityId : Nat) : async [FileRecord] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list file records");
     };
 
-    fileRecords.values().toArray().filter(func(f) { f.opportunityId == opportunityId }).map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
+    let isAdmin = AccessControl.isAdmin(accessControlState, caller) or confidentialUsers.containsKey(caller);
+
+    fileRecordsV2.values().toArray()
+      .filter(func(f : InternalFileRecord) : Bool {
+        if (f.opportunityId != opportunityId) { return false };
+        if (not f.isConfidential) { return true };
+        if (isAdmin) { return true };
+        switch (filePermissions.get(f.id)) {
+          case (null) { false };
+          case (?allowed) {
+            allowed.find(func(p : Principal) : Bool { p == caller }) != null
+          };
+        };
+      })
+      .map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
   };
 
   // CalendarItem
@@ -769,15 +1090,15 @@ actor {
   };
 
   public query ({ caller }) func listCalendarItems() : async [CalendarItem] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list calendar items");
     };
 
     calendarItems.values().toArray();
   };
 
-  // TodoItem
-  public shared ({ caller }) func createTodoItem(title : Text, assignedTo : Text, stage : Text) : async TodoItem {
+  // TodoItem V3 -- all runtime functions use todoItemsV3
+  public shared ({ caller }) func createTodoItem(title : Text, assignedTo : Text, stage : Text, opportunityId : ?Nat, priority : Text) : async TodoItem {
     ensureUserRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can create todo items");
@@ -789,20 +1110,22 @@ actor {
       assignedTo;
       stage;
       createdAt = Int.abs(Time.now());
+      opportunityId;
+      priority;
     };
 
-    todoItems.add(todoItemCounter, newTodoItem);
+    todoItemsV3.add(todoItemCounter, newTodoItem);
     todoItemCounter += 1;
 
     newTodoItem;
   };
 
-  public shared ({ caller }) func updateTodoItem(id : Nat, title : Text, assignedTo : Text, stage : Text) : async ?TodoItem {
+  public shared ({ caller }) func updateTodoItem(id : Nat, title : Text, assignedTo : Text, stage : Text, opportunityId : ?Nat, priority : Text) : async ?TodoItem {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can update todo items");
     };
 
-    switch (todoItems.get(id)) {
+    switch (todoItemsV3.get(id)) {
       case (null) { null };
       case (?existing) {
         let updatedTodoItem : TodoItem = {
@@ -811,8 +1134,10 @@ actor {
           assignedTo;
           stage;
           createdAt = existing.createdAt;
+          opportunityId;
+          priority;
         };
-        todoItems.add(id, updatedTodoItem);
+        todoItemsV3.add(id, updatedTodoItem);
         ?updatedTodoItem;
       };
     };
@@ -823,15 +1148,15 @@ actor {
       Runtime.trap("Unauthorized: Only users can delete todo items");
     };
 
-    todoItems.remove(id);
+    todoItemsV3.remove(id);
     true;
   };
 
   public query ({ caller }) func listTodoItems() : async [TodoItem] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list todo items");
     };
 
-    todoItems.values().toArray();
+    todoItemsV3.values().toArray();
   };
 };

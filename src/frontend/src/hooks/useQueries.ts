@@ -1,3 +1,4 @@
+import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CalendarItem,
@@ -303,6 +304,76 @@ export function useFileRecords(opportunityId: bigint) {
   });
 }
 
+export function useAdminAllFileRecords() {
+  const { actor, isFetching } = useActor();
+  return useQuery<FileRecord[]>({
+    queryKey: ["admin", "files", "all"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).listAllFileRecordsAdmin();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useFilePermissions(fileId: bigint, enabled: boolean) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Principal[]>({
+    queryKey: ["filePermissions", fileId.toString()],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).listFilePermissions(fileId);
+    },
+    enabled: !!actor && !isFetching && enabled,
+  });
+}
+
+export function useSetFileConfidential() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { fileId: bigint; confidential: boolean }) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).setFileConfidential(data.fileId, data.confidential);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "files", "all"] });
+    },
+  });
+}
+
+export function useGrantFileAccess() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { fileId: bigint; user: Principal }) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).grantFileAccess(data.fileId, data.user);
+    },
+    onSuccess: (_data: any, vars: { fileId: bigint; user: Principal }) => {
+      qc.invalidateQueries({
+        queryKey: ["filePermissions", vars.fileId.toString()],
+      });
+    },
+  });
+}
+
+export function useRevokeFileAccess() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { fileId: bigint; user: Principal }) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).revokeFileAccess(data.fileId, data.user);
+    },
+    onSuccess: (_data: any, vars: { fileId: bigint; user: Principal }) => {
+      qc.invalidateQueries({
+        queryKey: ["filePermissions", vars.fileId.toString()],
+      });
+    },
+  });
+}
+
 export function useAddFileRecord() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -441,9 +512,17 @@ export function useCreateTodoItem() {
       title: string;
       assignedTo: string;
       stage: string;
+      opportunityId?: bigint | null;
+      priority?: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.createTodoItem(data.title, data.assignedTo, data.stage);
+      return (actor as any).createTodoItem(
+        data.title,
+        data.assignedTo,
+        data.stage,
+        data.opportunityId ?? null,
+        data.priority ?? "medium",
+      );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["todoItems"] }),
   });
@@ -458,13 +537,17 @@ export function useUpdateTodoItem() {
       title: string;
       assignedTo: string;
       stage: string;
+      opportunityId?: bigint | null;
+      priority?: string;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateTodoItem(
+      return (actor as any).updateTodoItem(
         data.id,
         data.title,
         data.assignedTo,
         data.stage,
+        data.opportunityId ?? null,
+        data.priority ?? "medium",
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["todoItems"] }),
@@ -494,5 +577,43 @@ export function useUserProfiles() {
       return actor.listAllUserProfiles();
     },
     enabled: !!actor && !isFetching,
+  });
+}
+
+// ── Admin Role Management ───────────────────────────────────────────────────
+
+export function useMakeAdmin() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).makeAdmin(user);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
+  });
+}
+
+export function useAssignConfidentialRole() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).assignConfidentialRole(user);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
+  });
+}
+
+export function useDemoteToUser() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).demoteToUser(user);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
   });
 }

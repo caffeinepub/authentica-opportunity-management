@@ -73,6 +73,8 @@ export const TodoItem = IDL.Record({
   'assignedTo' : IDL.Text,
   'createdAt' : IDL.Int,
   'stage' : IDL.Text,
+  'opportunityId' : IDL.Opt(IDL.Nat),
+  'priority' : IDL.Text,
 });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const UserProfileDTO = IDL.Record({
@@ -135,7 +137,7 @@ export const idlService = IDL.Service({
       [Opportunity],
       [],
     ),
-  'createTodoItem' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [TodoItem], []),
+  'createTodoItem' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Text], [TodoItem], []),
   'deleteCalendarItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'deleteComment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'deleteFileRecord' : IDL.Func([IDL.Nat], [IDL.Bool], []),
@@ -164,6 +166,9 @@ export const idlService = IDL.Service({
   'listFileRecords' : IDL.Func([IDL.Nat], [IDL.Vec(FileRecord)], ['query']),
   'listOpportunities' : IDL.Func([], [IDL.Vec(Opportunity)], ['query']),
   'listTodoItems' : IDL.Func([], [IDL.Vec(TodoItem)], ['query']),
+  'makeAdmin' : IDL.Func([IDL.Principal], [], []),
+  'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
+  'demoteToUser' : IDL.Func([IDL.Principal], [], []),
   'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'unlinkContactFromOpportunity' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
@@ -183,7 +188,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'updateTodoItem' : IDL.Func(
-      [IDL.Nat, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Nat, IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Text],
       [IDL.Opt(TodoItem)],
       [],
     ),
@@ -257,6 +262,8 @@ export const idlFactory = ({ IDL }) => {
     'assignedTo' : IDL.Text,
     'createdAt' : IDL.Int,
     'stage' : IDL.Text,
+    'opportunityId' : IDL.Opt(IDL.Nat),
+    'priority' : IDL.Text,
   });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const UserProfileDTO = IDL.Record({
@@ -319,7 +326,7 @@ export const idlFactory = ({ IDL }) => {
         [Opportunity],
         [],
       ),
-    'createTodoItem' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [TodoItem], []),
+    'createTodoItem' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Text], [TodoItem], []),
     'deleteCalendarItem' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'deleteComment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'deleteFileRecord' : IDL.Func([IDL.Nat], [IDL.Bool], []),
@@ -348,6 +355,12 @@ export const idlFactory = ({ IDL }) => {
     'listFileRecords' : IDL.Func([IDL.Nat], [IDL.Vec(FileRecord)], ['query']),
     'listOpportunities' : IDL.Func([], [IDL.Vec(Opportunity)], ['query']),
     'listTodoItems' : IDL.Func([], [IDL.Vec(TodoItem)], ['query']),
+    'makeAdmin' : IDL.Func([IDL.Principal], [], []),
+    'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
+    'demoteToUser' : IDL.Func([IDL.Principal], [], []),
+  'makeAdmin' : IDL.Func([IDL.Principal], [], []),
+  'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
+  'demoteToUser' : IDL.Func([IDL.Principal], [], []),
     'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'unlinkContactFromOpportunity' : IDL.Func(
@@ -371,7 +384,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateTodoItem' : IDL.Func(
-        [IDL.Nat, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Nat, IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Text],
         [IDL.Opt(TodoItem)],
         [],
       ),

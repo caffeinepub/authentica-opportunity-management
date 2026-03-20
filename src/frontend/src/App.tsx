@@ -10,6 +10,7 @@ import { LogIn, TrendingUp } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import { UserProvider } from "./context/UserContext";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import AdminPage from "./pages/AdminPage";
 import CalendarPage from "./pages/CalendarPage";
 import ContactsPage from "./pages/ContactsPage";
 import Dashboard from "./pages/Dashboard";
@@ -119,11 +120,18 @@ const calendarRoute = createRoute({
   component: CalendarPage,
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   contactsRoute,
   opportunityRoute,
   calendarRoute,
+  adminRoute,
 ]);
 
 const router = createRouter({ routeTree });

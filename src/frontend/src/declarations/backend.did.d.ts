@@ -59,6 +59,8 @@ export interface TodoItem {
   'assignedTo' : string,
   'createdAt' : bigint,
   'stage' : string,
+  'opportunityId' : [] | [bigint],
+  'priority' : string,
 }
 export interface UserProfile { 'name' : string }
 export interface UserProfileDTO { 'principal' : Principal, 'name' : string }
@@ -112,7 +114,7 @@ export interface _SERVICE {
     [string, string, bigint, bigint, string],
     Opportunity
   >,
-  'createTodoItem' : ActorMethod<[string, string, string], TodoItem>,
+  'createTodoItem' : ActorMethod<[string, string, string, [] | [bigint], string], TodoItem>,
   'deleteCalendarItem' : ActorMethod<[bigint], boolean>,
   'deleteComment' : ActorMethod<[bigint], boolean>,
   'deleteFileRecord' : ActorMethod<[bigint], boolean>,
@@ -133,6 +135,9 @@ export interface _SERVICE {
   'listFileRecords' : ActorMethod<[bigint], Array<FileRecord>>,
   'listOpportunities' : ActorMethod<[], Array<Opportunity>>,
   'listTodoItems' : ActorMethod<[], Array<TodoItem>>,
+  'makeAdmin' : ActorMethod<[Principal], undefined>,
+  'assignConfidentialRole' : ActorMethod<[Principal], undefined>,
+  'demoteToUser' : ActorMethod<[Principal], undefined>,
   'removeContact' : ActorMethod<[bigint], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'unlinkContactFromOpportunity' : ActorMethod<[bigint, bigint], boolean>,
@@ -146,7 +151,7 @@ export interface _SERVICE {
     [] | [Opportunity]
   >,
   'updateTodoItem' : ActorMethod<
-    [bigint, string, string, string],
+    [bigint, string, string, string, [] | [bigint], string],
     [] | [TodoItem]
   >,
 }

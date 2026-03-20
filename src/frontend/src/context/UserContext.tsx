@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import { useActor } from "../hooks/useActor";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 interface UserContextValue {
   userName: string;
@@ -36,9 +37,11 @@ export function useUser() {
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const { actor, isFetching } = useActor();
+  const { clear } = useInternetIdentity();
   const [userName, setUserNameState] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [registrationFull, setRegistrationFull] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -49,11 +52,38 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const profile = await actor.getCallerUserProfile();
         if (profile?.name) {
           setUserNameState(profile.name);
+        } else if (profile && !profile.name) {
+          // Registered but no display name set
+          setShowNamePrompt(true);
+        } else {
+          // Not registered yet -- check if there's capacity
+          try {
+            const [allUsers, maxUsersRaw] = await Promise.all([
+              actor.listAllUserProfiles(),
+              (actor as any).getMaxUsers(),
+            ]);
+            const maxNum = Number(maxUsersRaw);
+            if (allUsers.length >= maxNum) {
+              // User limit reached -- this user cannot register
+              setRegistrationFull(true);
+            } else {
+              setShowNamePrompt(true);
+            }
+          } catch {
+            // If capacity check fails, show the name prompt as fallback
+            setShowNamePrompt(true);
+          }
+        }
+      } catch (err) {
+        // getCallerUserProfile can fail if the user has no role yet (e.g. after a fresh deployment).
+        // In that case, show the name prompt rather than blocking them entirely.
+        // Only block if the error message explicitly indicates the user limit was reached.
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("User limit reached")) {
+          setRegistrationFull(true);
         } else {
           setShowNamePrompt(true);
         }
-      } catch {
-        // ignore
       } finally {
         setIsLoading(false);
       }
@@ -72,7 +102,19 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setUserNameState(nameInput.trim());
       setShowNamePrompt(false);
     } catch {
-      // ignore
+      // If saving fails (e.g. limit enforced at backend), check if limit is now full
+      try {
+        const [allUsers, maxUsersRaw] = await Promise.all([
+          actor.listAllUserProfiles(),
+          (actor as any).getMaxUsers(),
+        ]);
+        if (allUsers.length >= Number(maxUsersRaw)) {
+          setShowNamePrompt(false);
+          setRegistrationFull(true);
+        }
+      } catch {
+        // ignore
+      }
     } finally {
       setSaving(false);
     }
@@ -81,6 +123,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
   return (
     <UserContext.Provider value={{ userName, setUserName, isLoading }}>
       {children}
+
+      {/* Registration full -- user cannot join */}
+      <Dialog open={registrationFull} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              Access Restricted
+            </DialogTitle>
+            <DialogDescription>
+              This workspace has reached its maximum number of users. Contact
+              your admin to request access or increase the user limit.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={clear}>
+              Sign Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Name prompt for new users */}
       <Dialog open={showNamePrompt} onOpenChange={() => {}}>
         <DialogContent
           className="sm:max-w-md"

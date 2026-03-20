@@ -346,7 +346,7 @@ export default function OpportunityDetail() {
                 value={editCloseDate}
                 onChange={(e) => setEditCloseDate(e.target.value)}
                 type="date"
-                className="mt-1"
+                className="mt-1 [color-scheme:dark]"
               />
             </div>
             <div>

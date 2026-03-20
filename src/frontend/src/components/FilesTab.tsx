@@ -18,6 +18,7 @@ import {
   FileVideo,
   FolderOpen,
   Loader2,
+  Lock,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -32,6 +33,10 @@ import {
   useFileRecords,
   useUpdateFileRecord,
 } from "../hooks/useQueries";
+
+// FileRecord from backend.ts doesn't include isConfidential yet;
+// the backend returns it at runtime so we extend the type here.
+type FileRecordX = FileRecord & { isConfidential?: boolean };
 
 // Derive a file extension from a MIME type
 function extFromMime(mime: string): string {
@@ -83,7 +88,7 @@ function FileRow({
   file,
   opportunityId,
   index,
-}: { file: FileRecord; opportunityId: bigint; index: number }) {
+}: { file: FileRecordX; opportunityId: bigint; index: number }) {
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(file.displayName);
   const [folder, setFolder] = useState(file.folder);
@@ -184,13 +189,23 @@ function FileRow({
           </div>
         ) : (
           <>
-            <button
-              type="button"
-              onClick={handleClickLink}
-              className="text-sm font-medium text-foreground hover:text-primary truncate block text-left w-full"
-            >
-              {file.displayName}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleClickLink}
+                className="text-sm font-medium text-foreground hover:text-primary truncate block text-left"
+              >
+                {file.displayName}
+              </button>
+              {file.isConfidential && (
+                <span
+                  title="Confidential"
+                  className="inline-flex items-center shrink-0"
+                >
+                  <Lock className="w-3 h-3 text-primary" />
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               {new Date(Number(file.uploadedAt)).toLocaleDateString()} · by{" "}
               {file.uploadedBy}
@@ -292,8 +307,8 @@ export default function FilesTab({ opportunityId }: { opportunityId: bigint }) {
     }
   };
 
-  const files = filesQuery.data ?? [];
-  const folderMap = new Map<string, FileRecord[]>();
+  const files = (filesQuery.data ?? []) as FileRecordX[];
+  const folderMap = new Map<string, FileRecordX[]>();
   for (const f of files) {
     const list = folderMap.get(f.folder) ?? [];
     list.push(f);

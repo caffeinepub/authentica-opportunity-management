@@ -119,6 +119,8 @@ export interface TodoItem {
     assignedTo: string;
     createdAt: bigint;
     stage: string;
+    opportunityId?: bigint;
+    priority: string;
 }
 export interface _CaffeineStorageRefillInformation {
     proposed_top_up_amount?: bigint;
@@ -177,7 +179,7 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCalendarItem(title: string, dateTimestamp: bigint, timeLabel: string, notes: string, opportunityId: bigint | null, createdBy: string): Promise<CalendarItem>;
     createOpportunity(name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity>;
-    createTodoItem(title: string, assignedTo: string, stage: string): Promise<TodoItem>;
+    createTodoItem(title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem>;
     deleteCalendarItem(id: bigint): Promise<boolean>;
     deleteComment(id: bigint): Promise<boolean>;
     deleteFileRecord(id: bigint): Promise<boolean>;
@@ -198,13 +200,16 @@ export interface backendInterface {
     listFileRecords(opportunityId: bigint): Promise<Array<FileRecord>>;
     listOpportunities(): Promise<Array<Opportunity>>;
     listTodoItems(): Promise<Array<TodoItem>>;
+    makeAdmin(user: Principal): Promise<void>;
+    assignConfidentialRole(user: Principal): Promise<void>;
+    demoteToUser(user: Principal): Promise<void>;
     removeContact(id: bigint): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     unlinkContactFromOpportunity(contactId: bigint, opportunityId: bigint): Promise<boolean>;
     updateContact(id: bigint, name: string, email: string, phone: string, title: string): Promise<Contact | null>;
     updateFileRecord(id: bigint, displayName: string, folder: string): Promise<FileRecord | null>;
     updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity | null>;
-    updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string): Promise<TodoItem | null>;
+    updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem | null>;
 }
 import type { CalendarItem as _CalendarItem, Contact as _Contact, FileRecord as _FileRecord, Opportunity as _Opportunity, TodoItem as _TodoItem, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -405,18 +410,18 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createTodoItem(arg0: string, arg1: string, arg2: string): Promise<TodoItem> {
+    async createTodoItem(arg0: string, arg1: string, arg2: string, arg3: bigint | null, arg4: string = 'medium'): Promise<TodoItem> {
         if (this.processError) {
             try {
-                const result = await this.actor.createTodoItem(arg0, arg1, arg2);
-                return result;
+                const result = await this.actor.createTodoItem(arg0, arg1, arg2, to_candid_opt_n10(this._uploadFile, this._downloadFile, arg3), arg4);
+                return from_candid_TodoItem_n21(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createTodoItem(arg0, arg1, arg2);
-            return result;
+            const result = await this.actor.createTodoItem(arg0, arg1, arg2, to_candid_opt_n10(this._uploadFile, this._downloadFile, arg3), arg4);
+            return from_candid_TodoItem_n21(this._uploadFile, this._downloadFile, result);
         }
     }
     async deleteCalendarItem(arg0: bigint): Promise<boolean> {
@@ -689,14 +694,14 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.listTodoItems();
-                return result;
+                return result.map(item => from_candid_TodoItem_n21(this._uploadFile, this._downloadFile, item));
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.listTodoItems();
-            return result;
+            return result.map(item => from_candid_TodoItem_n21(this._uploadFile, this._downloadFile, item));
         }
     }
     async removeContact(arg0: bigint): Promise<boolean> {
@@ -783,18 +788,60 @@ export class Backend implements backendInterface {
             return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
         }
     }
-    async updateTodoItem(arg0: bigint, arg1: string, arg2: string, arg3: string): Promise<TodoItem | null> {
+    async updateTodoItem(arg0: bigint, arg1: string, arg2: string, arg3: string, arg4: bigint | null, arg5: string = 'medium'): Promise<TodoItem | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateTodoItem(arg0, arg1, arg2, arg3);
+                const result = await this.actor.updateTodoItem(arg0, arg1, arg2, arg3, to_candid_opt_n10(this._uploadFile, this._downloadFile, arg4), arg5);
                 return from_candid_opt_n20(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateTodoItem(arg0, arg1, arg2, arg3);
+            const result = await this.actor.updateTodoItem(arg0, arg1, arg2, arg3, to_candid_opt_n10(this._uploadFile, this._downloadFile, arg4), arg5);
             return from_candid_opt_n20(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async makeAdmin(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.makeAdmin(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.makeAdmin(arg0);
+            return result;
+        }
+    }
+    async assignConfidentialRole(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.assignConfidentialRole(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.assignConfidentialRole(arg0);
+            return result;
+        }
+    }
+    async demoteToUser(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.demoteToUser(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.demoteToUser(arg0);
+            return result;
         }
     }
 }
@@ -819,8 +866,19 @@ function from_candid_opt_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 function from_candid_opt_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_FileRecord]): FileRecord | null {
     return value.length === 0 ? null : value[0];
 }
+function from_candid_TodoItem_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _TodoItem): TodoItem {
+    return {
+        id: value.id,
+        title: value.title,
+        assignedTo: value.assignedTo,
+        createdAt: value.createdAt,
+        stage: value.stage,
+        opportunityId: value.opportunityId != null && value.opportunityId.length !== 0 ? value.opportunityId[0] : undefined,
+        priority: (value as any).priority ?? 'medium',
+    };
+}
 function from_candid_opt_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_TodoItem]): TodoItem | null {
-    return value.length === 0 ? null : value[0];
+    return value.length === 0 ? null : from_candid_TodoItem_n21(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [boolean]): boolean | null {
     return value.length === 0 ? null : value[0];

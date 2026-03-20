@@ -192,9 +192,7 @@ export function InternetIdentityProvider({
       currentIdentity instanceof DelegationIdentity &&
       isDelegationValid(currentIdentity.getDelegation())
     ) {
-      // Already authenticated — just surface the identity
-      setIdentity(currentIdentity);
-      setStatus("success");
+      setErrorMessage("User is already authenticated");
       return;
     }
 
@@ -249,20 +247,16 @@ export function InternetIdentityProvider({
         if (isAuthenticated) {
           const loadedIdentity = existingClient.getIdentity();
           setIdentity(loadedIdentity);
-          // IMPORTANT: set success BEFORE the finally block runs so it is not overwritten
-          setStatus("success");
-        } else {
-          setStatus("idle");
         }
       } catch (unknownError) {
-        if (!cancelled) {
-          setStatus("loginError");
-          setError(
-            unknownError instanceof Error
-              ? unknownError
-              : new Error("Initialization failed"),
-          );
-        }
+        setStatus("loginError");
+        setError(
+          unknownError instanceof Error
+            ? unknownError
+            : new Error("Initialization failed"),
+        );
+      } finally {
+        if (!cancelled) setStatus("idle");
       }
     })();
     return () => {

@@ -31,10 +31,19 @@ const STAGES = [
   "Closed Lost",
 ];
 
-export default function NewOpportunityModal() {
+interface Props {
+  defaultStage?: string;
+  /** "default" shows the full "New Opportunity" button; "ghost-icon" shows a small + icon button */
+  triggerVariant?: "default" | "ghost-icon";
+}
+
+export default function NewOpportunityModal({
+  defaultStage = "Prospecting",
+  triggerVariant = "default",
+}: Props) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [stage, setStage] = useState("Prospecting");
+  const [stage, setStage] = useState(defaultStage);
   const [value, setValue] = useState("");
   const [closeDate, setCloseDate] = useState("");
   const [summary, setSummary] = useState("");
@@ -43,7 +52,7 @@ export default function NewOpportunityModal() {
 
   const reset = () => {
     setName("");
-    setStage("Prospecting");
+    setStage(defaultStage);
     setValue("");
     setCloseDate("");
     setSummary("");
@@ -62,7 +71,6 @@ export default function NewOpportunityModal() {
       const valueNum = value
         ? BigInt(Math.round(Number.parseFloat(value)))
         : BigInt(0);
-      // Parse as UTC midnight so display (also UTC) is consistent
       const closeDateMs = BigInt(new Date(`${closeDate}T00:00:00Z`).getTime());
       await createOpp.mutateAsync({
         name: name.trim(),
@@ -88,9 +96,22 @@ export default function NewOpportunityModal() {
       }}
     >
       <DialogTrigger asChild>
-        <Button data-ocid="dashboard.new_opportunity_button" className="gap-2">
-          <Plus className="w-4 h-4" /> New Opportunity
-        </Button>
+        {triggerVariant === "ghost-icon" ? (
+          <button
+            type="button"
+            data-ocid="opportunity_kanban.add_opportunity.open_modal_button"
+            className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <Button
+            data-ocid="dashboard.new_opportunity_button"
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" /> New Opportunity
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -150,7 +171,7 @@ export default function NewOpportunityModal() {
               value={closeDate}
               onChange={(e) => setCloseDate(e.target.value)}
               type="date"
-              className="mt-1"
+              className="mt-1 [color-scheme:dark]"
             />
           </div>
           <div>

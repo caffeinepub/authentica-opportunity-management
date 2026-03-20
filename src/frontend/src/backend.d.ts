@@ -37,6 +37,8 @@ export interface TodoItem {
     assignedTo: string;
     createdAt: bigint;
     stage: string;
+    opportunityId?: bigint;
+    priority: string;
 }
 export interface FileRecord {
     id: bigint;
@@ -47,6 +49,7 @@ export interface FileRecord {
     uploadedAt: bigint;
     uploadedBy: string;
     folder: string;
+    isConfidential: boolean;
 }
 export interface CalendarItem {
     id: bigint;
@@ -64,6 +67,11 @@ export interface UserProfileDTO {
 export interface UserProfile {
     name: string;
 }
+export interface UserWithRole {
+    principal: Principal;
+    name: string;
+    role: string;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -77,7 +85,7 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCalendarItem(title: string, dateTimestamp: bigint, timeLabel: string, notes: string, opportunityId: bigint | null, createdBy: string): Promise<CalendarItem>;
     createOpportunity(name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity>;
-    createTodoItem(title: string, assignedTo: string, stage: string): Promise<TodoItem>;
+    createTodoItem(title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem>;
     deleteCalendarItem(id: bigint): Promise<boolean>;
     deleteComment(id: bigint): Promise<boolean>;
     deleteFileRecord(id: bigint): Promise<boolean>;
@@ -86,23 +94,32 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getContact(id: bigint): Promise<Contact | null>;
+    getMaxUsers(): Promise<bigint>;
     getOpportunity(id: bigint): Promise<Opportunity | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    grantFileAccess(fileId: bigint, user: Principal): Promise<boolean>;
     isCallerAdmin(): Promise<boolean>;
     linkContactToOpportunity(contactId: bigint, opportunityId: bigint): Promise<boolean>;
     listAllContacts(): Promise<Array<Contact>>;
+    listAllFileRecordsAdmin(): Promise<Array<FileRecord>>;
     listAllUserProfiles(): Promise<Array<UserProfileDTO>>;
+    listAllUsersWithRoles(): Promise<Array<UserWithRole>>;
     listCalendarItems(): Promise<Array<CalendarItem>>;
     listComments(opportunityId: bigint): Promise<Array<Comment>>;
     listContactsByOpportunity(opportunityId: bigint): Promise<Array<Contact>>;
+    listFilePermissions(fileId: bigint): Promise<Array<Principal>>;
     listFileRecords(opportunityId: bigint): Promise<Array<FileRecord>>;
     listOpportunities(): Promise<Array<Opportunity>>;
     listTodoItems(): Promise<Array<TodoItem>>;
     removeContact(id: bigint): Promise<boolean>;
+    removeUser(user: Principal): Promise<void>;
+    revokeFileAccess(fileId: bigint, user: Principal): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    setFileConfidential(fileId: bigint, confidential: boolean): Promise<boolean>;
+    setMaxUsers(limit: bigint): Promise<void>;
     unlinkContactFromOpportunity(contactId: bigint, opportunityId: bigint): Promise<boolean>;
     updateContact(id: bigint, name: string, email: string, phone: string, title: string): Promise<Contact | null>;
     updateFileRecord(id: bigint, displayName: string, folder: string): Promise<FileRecord | null>;
     updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity | null>;
-    updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string): Promise<TodoItem | null>;
+    updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem | null>;
 }
