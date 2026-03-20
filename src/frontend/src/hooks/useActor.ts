@@ -28,13 +28,6 @@ export function useActor() {
       const actor = await createActorWithConfig(actorOptions);
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
       await actor._initializeAccessControlWithSecret(adminToken);
-      // Restore any previously-saved role from stable storage so the backend
-      // re-applies the correct role even if the mixin assigned a lower one.
-      try {
-        await actor.restoreCallerRole();
-      } catch {
-        // Non-critical: ignore if this fails
-      }
       return actor;
     },
     // Only refetch when identity changes
