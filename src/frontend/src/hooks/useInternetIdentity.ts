@@ -88,9 +88,12 @@ export function InternetIdentityProvider({
   children: ReactNode;
   createOptions?: AuthClientCreateOptions;
 }>) {
-  // Use a ref for authClient so that storing it never triggers a re-render
-  // or re-runs the initialization effect.
-  const authClientRef = useRef<AuthClient | undefined>(undefined);
+  // authClient stored in a ref so updating it never triggers a re-render / effect re-run
+  const authClientRef = useRef<AuthClient | null>(null);
+  // Capture createOptions in a ref as well so the effect closure is stable
+  const createOptionsRef = useRef(createOptions);
+  createOptionsRef.current = createOptions;
+
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loginStatus, setStatus] = useState<Status>("initializing");
   const [loginError, setError] = useState<Error | undefined>(undefined);
@@ -128,12 +131,12 @@ export function InternetIdentityProvider({
     }
 
     const currentIdentity = client.getIdentity();
+    // If already authenticated, surface the identity directly instead of throwing
     if (
       !currentIdentity.getPrincipal().isAnonymous() &&
       currentIdentity instanceof DelegationIdentity &&
       isDelegationValid(currentIdentity.getDelegation())
     ) {
-      // Already authenticated — surface the existing identity instead of erroring
       setIdentity(currentIdentity);
       setStatus("success");
       return;
@@ -143,7 +146,7 @@ export function InternetIdentityProvider({
       identityProvider: DEFAULT_IDENTITY_PROVIDER,
       onSuccess: handleLoginSuccess,
       onError: handleLoginError,
-      maxTimeToLive: ONE_HOUR_IN_NANOSECONDS * BigInt(24 * 30),
+      maxTimeToLive: ONE_HOUR_IN_NANOSECONDS * BigInt(24 * 30), // 30 days
     };
 
     setStatus("logging-in");
@@ -161,7 +164,6 @@ export function InternetIdentityProvider({
       .logout()
       .then(() => {
         setIdentity(undefined);
-        authClientRef.current = undefined;
         setStatus("idle");
         setError(undefined);
       })
@@ -175,14 +177,14 @@ export function InternetIdentityProvider({
       });
   }, [setErrorMessage]);
 
-  // Run once on mount. authClientRef is a ref so it is NOT in the dependency
-  // array — this prevents the effect from re-running after we store the client.
+  // Run exactly once on mount via empty deps array.
+  // createOptions is read via ref so it's always current without re-running.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional empty deps, options accessed via ref
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        setStatus("initializing");
-        const client = await createAuthClient(createOptions);
+        const client = await createAuthClient(createOptionsRef.current);
         if (cancelled) return;
         authClientRef.current = client;
 
@@ -190,12 +192,12 @@ export function InternetIdentityProvider({
         if (cancelled) return;
 
         if (isAuthenticated) {
-          // Stored session found — go straight to success.
-          // Do NOT fall through to "idle" via a finally block.
-          setIdentity(client.getIdentity());
+          // Stored session found - surface identity immediately and mark success
+          const loadedIdentity = client.getIdentity();
+          setIdentity(loadedIdentity);
           setStatus("success");
         } else {
-          // No stored session — show the sign-in button.
+          // No stored session - show sign-in button
           setStatus("idle");
         }
       } catch (unknownError) {
@@ -208,13 +210,11 @@ export function InternetIdentityProvider({
           );
         }
       }
-      // NOTE: No `finally` block. Status is always set explicitly above
-      // so a finally block can never accidentally overwrite "success" with "idle".
     })();
     return () => {
       cancelled = true;
     };
-  }, [createOptions]);
+  }, []);
 
   const value = useMemo<ProviderValue>(
     () => ({
