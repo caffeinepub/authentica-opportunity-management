@@ -581,6 +581,7 @@ export function useUserProfiles() {
 }
 
 // ── Admin Role Management ───────────────────────────────────────────────────
+// All role changes go through the backend's assignCallerUserRole method.
 
 export function useMakeAdmin() {
   const { actor } = useActor();
@@ -588,7 +589,8 @@ export function useMakeAdmin() {
   return useMutation({
     mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
       if (!actor) throw new Error("Not connected");
-      return (actor as any).makeAdmin(user);
+      // Use assignCallerUserRole with 'admin' role tag
+      return actor.assignCallerUserRole(user, { admin: null } as any);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
   });
@@ -600,7 +602,8 @@ export function useAssignConfidentialRole() {
   return useMutation({
     mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
       if (!actor) throw new Error("Not connected");
-      return (actor as any).assignConfidentialRole(user);
+      // Use assignCallerUserRole with 'confidential' role tag
+      return actor.assignCallerUserRole(user, { confidential: null } as any);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
   });
@@ -612,7 +615,8 @@ export function useDemoteToUser() {
   return useMutation({
     mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
       if (!actor) throw new Error("Not connected");
-      return (actor as any).demoteToUser(user);
+      // Use assignCallerUserRole with 'user' role tag
+      return actor.assignCallerUserRole(user, { user: null } as any);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
   });
