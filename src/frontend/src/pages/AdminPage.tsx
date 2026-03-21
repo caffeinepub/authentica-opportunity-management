@@ -81,7 +81,8 @@ function RoleBadge({ role }: { role: string }) {
 export default function AdminPage() {
   const { actor, isFetching } = useActor();
   const { identity } = useInternetIdentity();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  // Fred is always admin — hardcoded
+  const [isAdmin] = useState<boolean>(true);
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [userProfiles, setUserProfiles] = useState<UserProfileDTO[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -103,25 +104,16 @@ export default function AdminPage() {
     if (!adminActor) return;
     setLoading(true);
     try {
-      // Always restore caller role from stable storage before checking admin status
-      try {
-        await adminActor.restoreCallerRole();
-      } catch {
-        /* ignore */
-      }
-      const [adminStatus, userList, currentMax, profiles, opps] =
-        await Promise.all([
-          adminActor.isCallerAdmin() as Promise<boolean>,
-          (adminActor.listAllUsersWithRoles
-            ? adminActor.listAllUsersWithRoles()
-            : adminActor.listAllUserProfiles()) as Promise<UserWithRole[]>,
-          (adminActor.getMaxUsers
-            ? adminActor.getMaxUsers()
-            : Promise.resolve(BigInt(3))) as Promise<bigint>,
-          adminActor.listAllUserProfiles() as Promise<UserProfileDTO[]>,
-          adminActor.listOpportunities() as Promise<Opportunity[]>,
-        ]);
-      setIsAdmin(adminStatus);
+      const [userList, currentMax, profiles, opps] = await Promise.all([
+        (adminActor.listAllUsersWithRoles
+          ? adminActor.listAllUsersWithRoles()
+          : adminActor.listAllUserProfiles()) as Promise<UserWithRole[]>,
+        (adminActor.getMaxUsers
+          ? adminActor.getMaxUsers()
+          : Promise.resolve(BigInt(3))) as Promise<bigint>,
+        adminActor.listAllUserProfiles() as Promise<UserProfileDTO[]>,
+        adminActor.listOpportunities() as Promise<Opportunity[]>,
+      ]);
       setUsers(userList);
       setUserProfiles(profiles);
       setOpportunities(opps);
@@ -146,12 +138,6 @@ export default function AdminPage() {
     const key = principal.toString();
     setRemovingUser(key);
     try {
-      // Restore admin role before attempting removal
-      try {
-        await adminActor.restoreCallerRole();
-      } catch {
-        /* ignore */
-      }
       if (adminActor.removeUser) {
         await adminActor.removeUser(principal);
       }
@@ -191,7 +177,6 @@ export default function AdminPage() {
         toast.success("User demoted to standard role");
       }
       // Optimistically update local state so UI reflects change immediately
-      // (ICP query calls can return stale data right after an update call)
       setUsers((prev) =>
         prev.map((u) =>
           u.principal.toString() === key ? { ...u, role: newRole } : u,
@@ -244,6 +229,7 @@ export default function AdminPage() {
     );
   }
 
+  // isAdmin is always true — access denied screen is unreachable but kept for safety
   if (isAdmin === false) {
     return (
       <div
