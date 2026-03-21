@@ -492,15 +492,52 @@ actor {
     };
   };
 
-  func canAccessFile(caller : Principal, fileId : Nat) : Bool {
-    if (AccessControl.isAdmin(accessControlState, caller)) { return true };
-    if (confidentialUsers.containsKey(caller)) { return true };
-    switch (filePermissions.get(fileId)) {
-      case (null) { false };
-      case (?allowed) {
-        allowed.find(func(p : Principal) : Bool { p == caller }) != null
-      };
+  func callerIsAdmin(caller : Principal) : Bool {
+    _restoreCallerRoleFromStable(caller);
+    AccessControl.isAdmin(accessControlState, caller)
+  };
+
+  // ── Public: restore caller role from stable storage ──
+  public shared ({ caller }) func restoreCallerRole() : async Text {
+    _restoreCallerRoleFromStable(caller);
+    switch (stableUserRoles.get(caller)) {
+      case (?r) { r };
+      case (null) { "guest" };
     };
+  };
+
+  // ── Public: remove a user (admin only) ──
+  public shared ({ caller }) func removeUser(user : Principal) : async () {
+    if (not callerIsAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only admins can remove users");
+    };
+    userProfiles.remove(user);
+    stableUserRoles.remove(user);
+    accessControlState.userRoles.remove(user);
+  };
+
+  // ── Public: set max users (admin only) ──
+  public shared ({ caller }) func setMaxUsers(limit : Nat) : async () {
+    if (not callerIsAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only admins can set max users");
+    };
+    maxUsers := limit;
+  };
+
+  // ── Public: list all users with roles ──
+  public query ({ caller }) func listAllUsersWithRoles() : async [UserWithRole] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
+      Runtime.trap("Unauthorized");
+    };
+    userProfiles.toArray().map<(Principal, UserProfile), UserWithRole>(
+      func((principal, profile)) {
+        let role = switch (stableUserRoles.get(principal)) {
+          case (?r) { r };
+          case (null) { "user" };
+        };
+        { principal; name = profile.name; role };
+      }
+    );
   };
 
   public query func getMaxUsers() : async Nat {
@@ -914,26 +951,114 @@ actor {
     };
   };
 
+  // listFileRecords: returns all files for the opportunity.
+  // For confidential files the caller cannot access, returns a masked placeholder
+  // (blobId = "", displayName = "Confidential File", uploadedBy = "").
   public query ({ caller }) func listFileRecords(opportunityId : Nat) : async [FileRecord] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list file records");
     };
 
-    let isAdmin = AccessControl.isAdmin(accessControlState, caller) or confidentialUsers.containsKey(caller);
+    let isAdmin = AccessControl.isAdmin(accessControlState, caller);
 
     fileRecordsV2.values().toArray()
       .filter(func(f : InternalFileRecord) : Bool {
-        if (f.opportunityId != opportunityId) { return false };
-        if (not f.isConfidential) { return true };
-        if (isAdmin) { return true };
-        switch (filePermissions.get(f.id)) {
+        f.opportunityId == opportunityId
+      })
+      .map<InternalFileRecord, FileRecord>(func(internal) : FileRecord {
+        if (not internal.isConfidential) { return FileRecord.fromInternal(internal) };
+        if (isAdmin) { return FileRecord.fromInternal(internal) };
+        let hasAccess = switch (filePermissions.get(internal.id)) {
           case (null) { false };
           case (?allowed) {
             allowed.find(func(p : Principal) : Bool { p == caller }) != null
           };
         };
-      })
-      .map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
+        if (hasAccess) { return FileRecord.fromInternal(internal) };
+        // Return masked placeholder
+        {
+          id = internal.id;
+          opportunityId = internal.opportunityId;
+          displayName = "Confidential File";
+          folder = internal.folder;
+          blobId = "";
+          fileType = "";
+          uploadedAt = internal.uploadedAt;
+          uploadedBy = "";
+          isConfidential = true;
+        }
+      });
+  };
+
+  // Mark a file as confidential (admin only)
+  public shared ({ caller }) func setFileConfidential(fileId : Nat, confidential : Bool) : async Bool {
+    ensureUserRegistered(caller);
+    if (not callerIsAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only admins can mark files as confidential");
+    };
+    switch (fileRecordsV2.get(fileId)) {
+      case (null) { false };
+      case (?existing) {
+        let updated : InternalFileRecord = {
+          existing with isConfidential = confidential
+        };
+        fileRecordsV2.add(fileId, updated);
+        if (not confidential) { filePermissions.remove(fileId) };
+        true;
+      };
+    };
+  };
+
+  // Grant a user access to a confidential file (admin only)
+  public shared ({ caller }) func grantFileAccess(fileId : Nat, user : Principal) : async Bool {
+    ensureUserRegistered(caller);
+    if (not callerIsAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only admins can grant file access");
+    };
+    let current = switch (filePermissions.get(fileId)) {
+      case (null) { [] };
+      case (?list) { list };
+    };
+    if (current.find(func(p : Principal) : Bool { p == user }) != null) {
+      return true;
+    };
+    filePermissions.add(fileId, current.concat([user]));
+    true;
+  };
+
+  // Revoke a user's access to a confidential file (admin only)
+  public shared ({ caller }) func revokeFileAccess(fileId : Nat, user : Principal) : async Bool {
+    ensureUserRegistered(caller);
+    if (not callerIsAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only admins can revoke file access");
+    };
+    switch (filePermissions.get(fileId)) {
+      case (null) { true };
+      case (?list) {
+        let filtered = list.filter(func(p : Principal) : Bool { p != user });
+        filePermissions.add(fileId, filtered);
+        true;
+      };
+    };
+  };
+
+  // List users with access to a confidential file (admin only)
+  public query ({ caller }) func listFilePermissions(fileId : Nat) : async [Principal] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can view file permissions");
+    };
+    switch (filePermissions.get(fileId)) {
+      case (null) { [] };
+      case (?list) { list };
+    };
+  };
+
+  // List all file records across all opportunities (admin only)
+  public query ({ caller }) func listAllFileRecordsAdmin() : async [FileRecord] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can list all file records");
+    };
+    fileRecordsV2.values().toArray().map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
   };
 
   // CalendarItem

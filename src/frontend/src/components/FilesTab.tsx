@@ -19,12 +19,17 @@ import {
   FolderOpen,
   Loader2,
   Lock,
+  Shield,
+  ShieldOff,
   Trash2,
   Upload,
+  UserCheck,
+  UserX,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useUser } from "../context/UserContext";
+import { useActor } from "../hooks/useActor";
 import { useBlobStorage } from "../hooks/useBlobStorage";
 import {
   type FileRecord,
@@ -34,11 +39,8 @@ import {
   useUpdateFileRecord,
 } from "../hooks/useQueries";
 
-// FileRecord from backend.ts doesn't include isConfidential yet;
-// the backend returns it at runtime so we extend the type here.
 type FileRecordX = FileRecord & { isConfidential?: boolean };
 
-// Derive a file extension from a MIME type
 function extFromMime(mime: string): string {
   const map: Record<string, string> = {
     "image/jpeg": ".jpg",
@@ -65,11 +67,9 @@ function extFromMime(mime: string): string {
   return map[mime] ?? "";
 }
 
-// Build a download filename: use displayName and append ext if missing
 function buildDownloadName(displayName: string, fileType: string): string {
   const ext = extFromMime(fileType);
   if (!ext) return displayName;
-  // Check if displayName already ends with the extension (case-insensitive)
   if (displayName.toLowerCase().endsWith(ext.toLowerCase())) return displayName;
   return displayName + ext;
 }
@@ -84,36 +84,162 @@ function getFileIcon(fileType: string) {
   return <File className="w-4 h-4 text-muted-foreground" />;
 }
 
+// Panel to manage per-user access for a confidential file
+function AccessPanel({
+  fileId,
+  onClose,
+}: { fileId: bigint; onClose: () => void }) {
+  const { actor } = useActor();
+  const { data: allUsers } = useAllUsers();
+  const [grantedPrincipals, setGrantedPrincipals] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!actor) return;
+    actor
+      .listFilePermissions(fileId)
+      .then((principals) => {
+        setGrantedPrincipals(principals.map((p) => p.toString()));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [actor, fileId]);
+
+  const toggle = async (principal: string, currentlyGranted: boolean) => {
+    if (!actor) return;
+    try {
+      // We need to convert string principal back to Principal type
+      // The actor methods accept Principal objects
+      const { Principal } = await import("@icp-sdk/core/principal");
+      const p = Principal.fromText(principal);
+      if (currentlyGranted) {
+        await actor.revokeFileAccess(fileId, p);
+        setGrantedPrincipals((prev) => prev.filter((x) => x !== principal));
+        toast.success("Access revoked");
+      } else {
+        await actor.grantFileAccess(fileId, p);
+        setGrantedPrincipals((prev) => [...prev, principal]);
+        toast.success("Access granted");
+      }
+    } catch {
+      toast.error("Failed to update access");
+    }
+  };
+
+  return (
+    <div className="mt-3 p-3 bg-muted/40 border border-border rounded-lg space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-foreground">
+          Manage Access
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Close
+        </button>
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 className="w-3 h-3 animate-spin" /> Loading...
+        </div>
+      ) : !allUsers || allUsers.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No other users found.</p>
+      ) : (
+        <div className="space-y-1">
+          {allUsers.map((user) => {
+            const principalStr = user.principal.toString();
+            const granted = grantedPrincipals.includes(principalStr);
+            return (
+              <div
+                key={principalStr}
+                className="flex items-center justify-between py-1"
+              >
+                <span className="text-xs text-foreground">
+                  {user.name || `${principalStr.slice(0, 12)}...`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => toggle(principalStr, granted)}
+                  className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded ${
+                    granted
+                      ? "bg-primary/20 text-primary hover:bg-primary/30"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  {granted ? (
+                    <UserCheck className="w-3 h-3" />
+                  ) : (
+                    <UserX className="w-3 h-3" />
+                  )}
+                  {granted ? "Granted" : "Grant"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function useAllUsers() {
+  const { actor } = useActor();
+  const [data, setData] = useState<Array<{
+    principal: { toString(): string };
+    name: string;
+  }> | null>(null);
+  useEffect(() => {
+    if (!actor) return;
+    actor
+      .listAllUserProfiles()
+      .then((profiles) => {
+        setData(profiles as typeof data);
+      })
+      .catch(() => {});
+  }, [actor]);
+  return { data };
+}
+
 function FileRow({
   file,
   opportunityId,
   index,
-}: { file: FileRecordX; opportunityId: bigint; index: number }) {
+  isAdmin,
+}: {
+  file: FileRecordX;
+  opportunityId: bigint;
+  index: number;
+  isAdmin: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(file.displayName);
   const [folder, setFolder] = useState(file.folder);
+  const [showAccessPanel, setShowAccessPanel] = useState(false);
   const { resolveBlobUrl } = useBlobStorage();
   const updateFile = useUpdateFileRecord();
   const deleteFile = useDeleteFileRecord();
+  const { actor } = useActor();
+
+  // A locked file is confidential with no blobId (masked by backend)
+  const isLocked = !!file.isConfidential && !file.blobId;
 
   const handleClickLink = async () => {
+    if (isLocked) return;
     try {
       const url = await resolveBlobUrl(file.blobId);
       const downloadName = buildDownloadName(file.displayName, file.fileType);
-
-      // Fetch content and create a same-origin object URL so `download` attribute is respected
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error("Download failed");
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = objectUrl;
       a.download = downloadName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
       setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch {
       toast.error("Failed to download file");
@@ -144,95 +270,173 @@ function FileRow({
     }
   };
 
+  const handleToggleConfidential = async () => {
+    if (!actor) return;
+    try {
+      const newVal = !file.isConfidential;
+      await actor.setFileConfidential(file.id, newVal);
+      // Refetch is handled by invalidation in useUpdateFileRecord; trigger a page refresh hint
+      updateFile.reset();
+      toast.success(newVal ? "File marked confidential" : "File is now public");
+      // Force refetch by invalidating the query
+      window.dispatchEvent(new CustomEvent("refetch-files"));
+    } catch {
+      toast.error("Failed to update confidential status");
+    }
+  };
+
+  if (isLocked) {
+    return (
+      <div
+        className="flex items-center gap-3 py-2.5 px-3 rounded-md bg-muted/20"
+        data-ocid={`files.file.item.${index}`}
+      >
+        <Lock className="w-4 h-4 text-primary shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-muted-foreground italic">
+            Confidential File
+          </p>
+          <p className="text-xs text-muted-foreground">
+            You don't have access to this file
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="flex items-center gap-3 py-2.5 px-3 rounded-md hover:bg-muted/50 group"
-      data-ocid={`files.file.item.${index}`}
-    >
-      {getFileIcon(file.fileType)}
-      <div className="flex-1 min-w-0">
-        {editing ? (
-          <div className="flex gap-2 items-center">
-            <Input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="h-7 text-sm"
-              placeholder="File name"
-            />
-            <Input
-              value={folder}
-              onChange={(e) => setFolder(e.target.value)}
-              className="h-7 text-sm w-32"
-              placeholder="Folder"
-            />
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={updateFile.isPending}
-              className="h-7 px-2"
-            >
-              {updateFile.isPending ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                "Save"
-              )}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setEditing(false)}
-              className="h-7 px-2"
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleClickLink}
-                className="text-sm font-medium text-foreground hover:text-primary truncate block text-left"
+    <div className="space-y-0">
+      <div
+        className="flex items-center gap-3 py-2.5 px-3 rounded-md hover:bg-muted/50 group"
+        data-ocid={`files.file.item.${index}`}
+      >
+        {getFileIcon(file.fileType)}
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <div className="flex gap-2 items-center">
+              <Input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="h-7 text-sm"
+                placeholder="File name"
+              />
+              <Input
+                value={folder}
+                onChange={(e) => setFolder(e.target.value)}
+                className="h-7 text-sm w-32"
+                placeholder="Folder"
+              />
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={updateFile.isPending}
+                className="h-7 px-2"
               >
-                {file.displayName}
-              </button>
-              {file.isConfidential && (
-                <span
-                  title="Confidential"
-                  className="inline-flex items-center shrink-0"
-                >
-                  <Lock className="w-3 h-3 text-primary" />
-                </span>
-              )}
+                {updateFile.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  "Save"
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditing(false)}
+                className="h-7 px-2"
+              >
+                Cancel
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {new Date(Number(file.uploadedAt)).toLocaleDateString()} · by{" "}
-              {file.uploadedBy}
-            </p>
-          </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleClickLink}
+                  className="text-sm font-medium text-foreground hover:text-primary truncate block text-left"
+                >
+                  {file.displayName}
+                </button>
+                {file.isConfidential && (
+                  <span
+                    title="Confidential"
+                    className="inline-flex items-center shrink-0"
+                  >
+                    <Lock className="w-3 h-3 text-primary" />
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {new Date(Number(file.uploadedAt)).toLocaleDateString()} · by{" "}
+                {file.uploadedBy}
+              </p>
+            </>
+          )}
+        </div>
+        {!editing && (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleToggleConfidential}
+                  className={`p-1 rounded text-xs ${
+                    file.isConfidential
+                      ? "hover:bg-muted text-primary"
+                      : "hover:bg-muted text-muted-foreground hover:text-primary"
+                  }`}
+                  title={
+                    file.isConfidential
+                      ? "Remove confidential"
+                      : "Mark confidential"
+                  }
+                >
+                  {file.isConfidential ? (
+                    <ShieldOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Shield className="w-3.5 h-3.5" />
+                  )}
+                </button>
+                {file.isConfidential && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAccessPanel((v) => !v)}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                    title="Manage access"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="Rename"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              data-ocid={`files.file.delete_button.${index}`}
+              onClick={handleDelete}
+              className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+              title="Delete"
+              disabled={deleteFile.isPending}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
       </div>
-      {!editing && (
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-            title="Rename"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            data-ocid={`files.file.delete_button.${index}`}
-            onClick={handleDelete}
-            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-            title="Delete"
-            disabled={deleteFile.isPending}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+      {isAdmin && showAccessPanel && file.isConfidential && (
+        <div className="px-3 pb-2">
+          <AccessPanel
+            fileId={file.id}
+            onClose={() => setShowAccessPanel(false)}
+          />
         </div>
       )}
     </div>
@@ -253,6 +457,16 @@ export default function FilesTab({ opportunityId }: { opportunityId: bigint }) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     new Set(["General"]),
   );
+
+  // Fred is the hardcoded admin
+  const isAdmin = userName === "Fred";
+
+  // Listen for confidential toggle refetch events
+  useEffect(() => {
+    const handler = () => filesQuery.refetch();
+    window.addEventListener("refetch-files", handler);
+    return () => window.removeEventListener("refetch-files", handler);
+  }, [filesQuery]);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders((prev) => {
@@ -401,6 +615,7 @@ export default function FilesTab({ opportunityId }: { opportunityId: bigint }) {
                         file={file}
                         opportunityId={opportunityId}
                         index={globalIndex}
+                        isAdmin={isAdmin}
                       />
                     );
                   })}
@@ -412,56 +627,39 @@ export default function FilesTab({ opportunityId }: { opportunityId: bigint }) {
       )}
 
       {/* Upload dialog */}
-      <Dialog
-        open={showUpload}
-        onOpenChange={(v) => {
-          if (!v) {
-            setShowUpload(false);
-            setSelectedFile(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={showUpload} onOpenChange={setShowUpload}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-display">Upload File</DialogTitle>
+            <DialogTitle>Upload File</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4">
             <div>
-              <Label>File</Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                {selectedFile?.name}
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="file-display-name">Display Name *</Label>
+              <Label htmlFor="upload-name">Display Name</Label>
               <Input
-                id="file-display-name"
+                id="upload-name"
                 value={uploadDisplayName}
                 onChange={(e) => setUploadDisplayName(e.target.value)}
-                placeholder="Friendly name for this file"
-                className="mt-1"
+                placeholder="File name"
               />
             </div>
             <div>
-              <Label htmlFor="file-folder">Folder</Label>
+              <Label htmlFor="upload-folder">Folder</Label>
               <Input
-                id="file-folder"
-                data-ocid="files.new_folder.input"
+                id="upload-folder"
                 value={uploadFolder}
                 onChange={(e) => setUploadFolder(e.target.value)}
-                placeholder="e.g. Contracts, Proposals"
-                className="mt-1"
+                placeholder="General"
               />
             </div>
+            {selectedFile && (
+              <p className="text-sm text-muted-foreground">
+                Selected: {selectedFile.name} (
+                {(selectedFile.size / 1024).toFixed(1)} KB)
+              </p>
+            )}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowUpload(false);
-                setSelectedFile(null);
-              }}
-            >
+            <Button variant="outline" onClick={() => setShowUpload(false)}>
               Cancel
             </Button>
             <Button
@@ -470,8 +668,7 @@ export default function FilesTab({ opportunityId }: { opportunityId: bigint }) {
             >
               {uploading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Uploading...
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Uploading...
                 </>
               ) : (
                 "Upload"

@@ -202,6 +202,11 @@ export interface backendInterface {
     listComments(opportunityId: bigint): Promise<Array<Comment>>;
     listContactsByOpportunity(opportunityId: bigint): Promise<Array<Contact>>;
     listFileRecords(opportunityId: bigint): Promise<Array<FileRecord>>;
+    listAllFileRecordsAdmin(): Promise<Array<FileRecord>>;
+    setFileConfidential(fileId: bigint, confidential: boolean): Promise<boolean>;
+    grantFileAccess(fileId: bigint, user: Principal): Promise<boolean>;
+    revokeFileAccess(fileId: bigint, user: Principal): Promise<boolean>;
+    listFilePermissions(fileId: bigint): Promise<Array<Principal>>;
     listOpportunities(): Promise<Array<Opportunity>>;
     listTodoItems(): Promise<Array<TodoItem>>;
     makeAdmin(user: Principal): Promise<void>;
@@ -680,6 +685,76 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.listFileRecords(arg0);
+            return result;
+        }
+    }
+    async listAllFileRecordsAdmin(): Promise<Array<FileRecord>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listAllFileRecordsAdmin();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listAllFileRecordsAdmin();
+            return result;
+        }
+    }
+    async setFileConfidential(arg0: bigint, arg1: boolean): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setFileConfidential(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setFileConfidential(arg0, arg1);
+            return result;
+        }
+    }
+    async grantFileAccess(arg0: bigint, arg1: Principal): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.grantFileAccess(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.grantFileAccess(arg0, arg1);
+            return result;
+        }
+    }
+    async revokeFileAccess(arg0: bigint, arg1: Principal): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.revokeFileAccess(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.revokeFileAccess(arg0, arg1);
+            return result;
+        }
+    }
+    async listFilePermissions(arg0: bigint): Promise<Array<Principal>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listFilePermissions(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listFilePermissions(arg0);
             return result;
         }
     }

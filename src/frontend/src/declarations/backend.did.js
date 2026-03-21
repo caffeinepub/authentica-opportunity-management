@@ -34,6 +34,9 @@ export const Contact = IDL.Record({
   'email' : IDL.Text,
   'phone' : IDL.Text,
   'bio' : IDL.Text,
+  'company' : IDL.Text,
+  'linkedinUrl' : IDL.Text,
+  'lastContacted' : IDL.Text,
 });
 export const FileRecord = IDL.Record({
   'id' : IDL.Nat,
@@ -44,6 +47,7 @@ export const FileRecord = IDL.Record({
   'uploadedAt' : IDL.Int,
   'uploadedBy' : IDL.Text,
   'folder' : IDL.Text,
+  'isConfidential' : IDL.Bool,
 });
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
@@ -67,6 +71,7 @@ export const Opportunity = IDL.Record({
   'createdAt' : IDL.Int,
   'summary' : IDL.Text,
   'stage' : IDL.Text,
+  'helpTypes' : IDL.Vec(IDL.Text),
 });
 export const TodoItem = IDL.Record({
   'id' : IDL.Nat,
@@ -134,7 +139,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'createOpportunity' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
+      [IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text, IDL.Vec(IDL.Text)],
       [Opportunity],
       [],
     ),
@@ -167,11 +172,9 @@ export const idlService = IDL.Service({
   'listFileRecords' : IDL.Func([IDL.Nat], [IDL.Vec(FileRecord)], ['query']),
   'listOpportunities' : IDL.Func([], [IDL.Vec(Opportunity)], ['query']),
   'listTodoItems' : IDL.Func([], [IDL.Vec(TodoItem)], ['query']),
-  'makeAdmin' : IDL.Func([IDL.Principal], [], []),
-  'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
-  'demoteToUser' : IDL.Func([IDL.Principal], [], []),
   'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'updateContactBio' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
+  'updateContactExtraFields' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'unlinkContactFromOpportunity' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
   'updateContact' : IDL.Func(
@@ -185,7 +188,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'updateOpportunity' : IDL.Func(
-      [IDL.Nat, IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
+      [IDL.Nat, IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text, IDL.Vec(IDL.Text)],
       [IDL.Opt(Opportunity)],
       [],
     ),
@@ -225,6 +228,9 @@ export const idlFactory = ({ IDL }) => {
     'email' : IDL.Text,
     'phone' : IDL.Text,
     'bio' : IDL.Text,
+    'company' : IDL.Text,
+    'linkedinUrl' : IDL.Text,
+    'lastContacted' : IDL.Text,
   });
   const FileRecord = IDL.Record({
     'id' : IDL.Nat,
@@ -235,6 +241,7 @@ export const idlFactory = ({ IDL }) => {
     'uploadedAt' : IDL.Int,
     'uploadedBy' : IDL.Text,
     'folder' : IDL.Text,
+    'isConfidential' : IDL.Bool,
   });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
@@ -258,6 +265,7 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : IDL.Int,
     'summary' : IDL.Text,
     'stage' : IDL.Text,
+    'helpTypes' : IDL.Vec(IDL.Text),
   });
   const TodoItem = IDL.Record({
     'id' : IDL.Nat,
@@ -325,7 +333,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'createOpportunity' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
+        [IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text, IDL.Vec(IDL.Text)],
         [Opportunity],
         [],
       ),
@@ -358,15 +366,9 @@ export const idlFactory = ({ IDL }) => {
     'listFileRecords' : IDL.Func([IDL.Nat], [IDL.Vec(FileRecord)], ['query']),
     'listOpportunities' : IDL.Func([], [IDL.Vec(Opportunity)], ['query']),
     'listTodoItems' : IDL.Func([], [IDL.Vec(TodoItem)], ['query']),
-    'makeAdmin' : IDL.Func([IDL.Principal], [], []),
-    'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
-    'demoteToUser' : IDL.Func([IDL.Principal], [], []),
-  'makeAdmin' : IDL.Func([IDL.Principal], [], []),
-  'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
-  'demoteToUser' : IDL.Func([IDL.Principal], [], []),
     'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'updateContactBio' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
-  'updateContactBio' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
+    'updateContactExtraFields' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'unlinkContactFromOpportunity' : IDL.Func(
         [IDL.Nat, IDL.Nat],
@@ -384,7 +386,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateOpportunity' : IDL.Func(
-        [IDL.Nat, IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text],
+        [IDL.Nat, IDL.Text, IDL.Text, IDL.Int, IDL.Int, IDL.Text, IDL.Vec(IDL.Text)],
         [IDL.Opt(Opportunity)],
         [],
       ),
