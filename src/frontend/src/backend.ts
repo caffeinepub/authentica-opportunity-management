@@ -182,7 +182,7 @@ export interface backendInterface {
     addFileRecord(opportunityId: bigint, displayName: string, folder: string, blobId: string, fileType: string, uploadedBy: string): Promise<FileRecord>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCalendarItem(title: string, dateTimestamp: bigint, timeLabel: string, notes: string, opportunityId: bigint | null, createdBy: string): Promise<CalendarItem>;
-    createOpportunity(name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity>;
+    createOpportunity(name: string, stage: string, value: bigint, closeDate: bigint, summary: string, helpTypes?: Array<string>): Promise<Opportunity>;
     createTodoItem(title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem>;
     deleteCalendarItem(id: bigint): Promise<boolean>;
     deleteComment(id: bigint): Promise<boolean>;
@@ -219,7 +219,7 @@ export interface backendInterface {
     updateContactBio(id: bigint, bio: string): Promise<boolean>;
     updateContactExtraFields(id: bigint, company: string, linkedinUrl: string, lastContacted: string): Promise<boolean>;
     updateFileRecord(id: bigint, displayName: string, folder: string): Promise<FileRecord | null>;
-    updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity | null>;
+    updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string, helpTypes?: Array<string>): Promise<Opportunity | null>;
     restoreCallerRole(): Promise<string>;
     updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem | null>;
 }
@@ -408,17 +408,17 @@ export class Backend implements backendInterface {
             return from_candid_CalendarItem_n11(this._uploadFile, this._downloadFile, result);
         }
     }
-    async createOpportunity(arg0: string, arg1: string, arg2: bigint, arg3: bigint, arg4: string): Promise<Opportunity> {
+    async createOpportunity(arg0: string, arg1: string, arg2: bigint, arg3: bigint, arg4: string, arg5: Array<string> = []): Promise<Opportunity> {
         if (this.processError) {
             try {
-                const result = await this.actor.createOpportunity(arg0, arg1, arg2, arg3, arg4);
+                const result = await this.actor.createOpportunity(arg0, arg1, arg2, arg3, arg4, arg5);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createOpportunity(arg0, arg1, arg2, arg3, arg4);
+            const result = await this.actor.createOpportunity(arg0, arg1, arg2, arg3, arg4, arg5);
             return result;
         }
     }
@@ -884,17 +884,17 @@ export class Backend implements backendInterface {
             return from_candid_opt_n19(this._uploadFile, this._downloadFile, result);
         }
     }
-    async updateOpportunity(arg0: bigint, arg1: string, arg2: string, arg3: bigint, arg4: bigint, arg5: string): Promise<Opportunity | null> {
+    async updateOpportunity(arg0: bigint, arg1: string, arg2: string, arg3: bigint, arg4: bigint, arg5: string, arg6: Array<string> = []): Promise<Opportunity | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateOpportunity(arg0, arg1, arg2, arg3, arg4, arg5);
+                const result = await this.actor.updateOpportunity(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
                 return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateOpportunity(arg0, arg1, arg2, arg3, arg4, arg5);
+            const result = await this.actor.updateOpportunity(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
             return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
         }
     }

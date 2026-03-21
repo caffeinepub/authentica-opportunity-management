@@ -47,6 +47,7 @@ export interface FileRecord {
   'uploadedAt' : bigint,
   'uploadedBy' : string,
   'folder' : string,
+  'isConfidential' : boolean,
 }
 export interface Opportunity {
   'id' : bigint,
@@ -56,6 +57,7 @@ export interface Opportunity {
   'createdAt' : bigint,
   'summary' : string,
   'stage' : string,
+  'helpTypes' : Array<string>,
 }
 export interface TodoItem {
   'id' : bigint,
@@ -115,7 +117,7 @@ export interface _SERVICE {
     CalendarItem
   >,
   'createOpportunity' : ActorMethod<
-    [string, string, bigint, bigint, string],
+    [string, string, bigint, bigint, string, Array<string>],
     Opportunity
   >,
   'createTodoItem' : ActorMethod<[string, string, string, [] | [bigint], string], TodoItem>,
@@ -129,6 +131,7 @@ export interface _SERVICE {
   'getContact' : ActorMethod<[bigint], [] | [Contact]>,
   'getOpportunity' : ActorMethod<[bigint], [] | [Opportunity]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'grantFileAccess' : ActorMethod<[bigint, Principal], boolean>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'linkContactToOpportunity' : ActorMethod<[bigint, bigint], boolean>,
   'listAllContacts' : ActorMethod<[], Array<Contact>>,
@@ -136,6 +139,7 @@ export interface _SERVICE {
   'listCalendarItems' : ActorMethod<[], Array<CalendarItem>>,
   'listComments' : ActorMethod<[bigint], Array<Comment>>,
   'listContactsByOpportunity' : ActorMethod<[bigint], Array<Contact>>,
+  'listFilePermissions' : ActorMethod<[bigint], Array<Principal>>,
   'listFileRecords' : ActorMethod<[bigint], Array<FileRecord>>,
   'listOpportunities' : ActorMethod<[], Array<Opportunity>>,
   'listTodoItems' : ActorMethod<[], Array<TodoItem>>,
@@ -143,6 +147,8 @@ export interface _SERVICE {
   'assignConfidentialRole' : ActorMethod<[Principal], undefined>,
   'demoteToUser' : ActorMethod<[Principal], undefined>,
   'removeContact' : ActorMethod<[bigint], boolean>,
+  'revokeFileAccess' : ActorMethod<[bigint, Principal], boolean>,
+  'setFileConfidential' : ActorMethod<[bigint, boolean], boolean>,
   'updateContactBio' : ActorMethod<[bigint, string], boolean>,
   'updateContactExtraFields' : ActorMethod<[bigint, string, string, string], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
@@ -153,7 +159,7 @@ export interface _SERVICE {
   >,
   'updateFileRecord' : ActorMethod<[bigint, string, string], [] | [FileRecord]>,
   'updateOpportunity' : ActorMethod<
-    [bigint, string, string, bigint, bigint, string],
+    [bigint, string, string, bigint, bigint, string, Array<string>],
     [] | [Opportunity]
   >,
   'updateTodoItem' : ActorMethod<
