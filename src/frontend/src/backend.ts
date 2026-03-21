@@ -112,6 +112,10 @@ export interface Contact {
     name: string;
     email: string;
     phone: string;
+    bio: string;
+    company: string;
+    linkedinUrl: string;
+    lastContacted: string;
 }
 export interface TodoItem {
     id: bigint;
@@ -207,6 +211,8 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     unlinkContactFromOpportunity(contactId: bigint, opportunityId: bigint): Promise<boolean>;
     updateContact(id: bigint, name: string, email: string, phone: string, title: string): Promise<Contact | null>;
+    updateContactBio(id: bigint, bio: string): Promise<boolean>;
+    updateContactExtraFields(id: bigint, company: string, linkedinUrl: string, lastContacted: string): Promise<boolean>;
     updateFileRecord(id: bigint, displayName: string, folder: string): Promise<FileRecord | null>;
     updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity | null>;
     restoreCallerRole(): Promise<string>;
@@ -759,6 +765,34 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.updateContact(arg0, arg1, arg2, arg3, arg4);
             return from_candid_opt_n16(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async updateContactBio(arg0: bigint, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).updateContactBio(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).updateContactBio(arg0, arg1);
+            return result;
+        }
+    }
+    async updateContactExtraFields(arg0: bigint, arg1: string, arg2: string, arg3: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).updateContactExtraFields(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).updateContactExtraFields(arg0, arg1, arg2, arg3);
+            return result;
         }
     }
     async updateFileRecord(arg0: bigint, arg1: string, arg2: string): Promise<FileRecord | null> {

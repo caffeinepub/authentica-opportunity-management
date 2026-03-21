@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Link } from "@tanstack/react-router";
 import {
   Link2,
   Link2Off,
@@ -181,7 +182,15 @@ export default function ContactsTab({
                   key={contact.id.toString()}
                   data-ocid={`contacts.item.${idx + 1}`}
                 >
-                  <TableCell className="font-medium">{contact.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      to="/contacts/$id"
+                      params={{ id: contact.id.toString() }}
+                      className="hover:text-primary hover:underline cursor-pointer"
+                    >
+                      {contact.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {contact.title || "—"}
                   </TableCell>

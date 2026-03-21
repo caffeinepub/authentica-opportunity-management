@@ -21,6 +21,7 @@ import { Loader2, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useCreateOpportunity } from "../hooks/useQueries";
+import HelpTypeSelector from "./HelpTypeSelector";
 
 const STAGES = [
   "Prospecting",
@@ -47,6 +48,7 @@ export default function NewOpportunityModal({
   const [value, setValue] = useState("");
   const [closeDate, setCloseDate] = useState("");
   const [summary, setSummary] = useState("");
+  const [helpTypes, setHelpTypes] = useState<Array<string>>([]);
 
   const createOpp = useCreateOpportunity();
 
@@ -56,6 +58,7 @@ export default function NewOpportunityModal({
     setValue("");
     setCloseDate("");
     setSummary("");
+    setHelpTypes([]);
   };
 
   const handleSubmit = async () => {
@@ -78,6 +81,7 @@ export default function NewOpportunityModal({
         value: valueNum,
         closeDate: closeDateMs,
         summary: summary.trim(),
+        helpTypes,
       });
       toast.success("Opportunity created");
       setOpen(false);
@@ -184,6 +188,13 @@ export default function NewOpportunityModal({
               placeholder="Brief description of this opportunity..."
               rows={3}
               className="mt-1"
+            />
+          </div>
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+            <HelpTypeSelector
+              label="Type of Help"
+              value={helpTypes}
+              onChange={setHelpTypes}
             />
           </div>
         </div>

@@ -5,6 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle, Calendar, Plus, TrendingUp } from "lucide-react";
 import { motion } from "motion/react";
 import { useOpportunities } from "../hooks/useQueries";
+import HelpTypeBadges from "./HelpTypeBadges";
 import NewOpportunityModal from "./NewOpportunityModal";
 
 const STAGES = [
@@ -161,6 +162,12 @@ export default function OpportunityKanban() {
                           </span>
                         </div>
                       </div>
+                      {/* Help Type Badges */}
+                      {opp.helpTypes && opp.helpTypes.length > 0 && (
+                        <div className="mt-2">
+                          <HelpTypeBadges helpTypes={opp.helpTypes} size="xs" />
+                        </div>
+                      )}
                       {opp.summary && (
                         <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
                           {opp.summary}

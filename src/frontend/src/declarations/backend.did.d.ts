@@ -33,6 +33,10 @@ export interface Contact {
   'name' : string,
   'email' : string,
   'phone' : string,
+  'bio' : string,
+  'company' : string,
+  'linkedinUrl' : string,
+  'lastContacted' : string,
 }
 export interface FileRecord {
   'id' : bigint,
@@ -139,6 +143,8 @@ export interface _SERVICE {
   'assignConfidentialRole' : ActorMethod<[Principal], undefined>,
   'demoteToUser' : ActorMethod<[Principal], undefined>,
   'removeContact' : ActorMethod<[bigint], boolean>,
+  'updateContactBio' : ActorMethod<[bigint, string], boolean>,
+  'updateContactExtraFields' : ActorMethod<[bigint, string, string, string], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'unlinkContactFromOpportunity' : ActorMethod<[bigint, bigint], boolean>,
   'updateContact' : ActorMethod<

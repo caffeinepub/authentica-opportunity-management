@@ -15,6 +15,7 @@ export interface Opportunity {
     createdAt: bigint;
     summary: string;
     stage: string;
+    helpTypes: Array<string>;
 }
 export interface Comment {
     id: bigint;
@@ -30,6 +31,10 @@ export interface Contact {
     name: string;
     email: string;
     phone: string;
+    bio: string;
+    company: string;
+    linkedinUrl: string;
+    lastContacted: string;
 }
 export interface TodoItem {
     id: bigint;
@@ -84,8 +89,8 @@ export interface backendInterface {
     addFileRecord(opportunityId: bigint, displayName: string, folder: string, blobId: string, fileType: string, uploadedBy: string): Promise<FileRecord>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCalendarItem(title: string, dateTimestamp: bigint, timeLabel: string, notes: string, opportunityId: bigint | null, createdBy: string): Promise<CalendarItem>;
-    createOpportunity(name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity>;
-    createTodoItem(title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem>;
+    createOpportunity(name: string, stage: string, value: bigint, closeDate: bigint, summary: string, helpTypes: Array<string>): Promise<Opportunity>;
+    createTodoItem(title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority: string): Promise<TodoItem>;
     deleteCalendarItem(id: bigint): Promise<boolean>;
     deleteComment(id: bigint): Promise<boolean>;
     deleteFileRecord(id: bigint): Promise<boolean>;
@@ -119,8 +124,10 @@ export interface backendInterface {
     setMaxUsers(limit: bigint): Promise<void>;
     unlinkContactFromOpportunity(contactId: bigint, opportunityId: bigint): Promise<boolean>;
     updateContact(id: bigint, name: string, email: string, phone: string, title: string): Promise<Contact | null>;
+    updateContactBio(id: bigint, bio: string): Promise<boolean>;
+    updateContactExtraFields(id: bigint, company: string, linkedinUrl: string, lastContacted: string): Promise<boolean>;
     updateFileRecord(id: bigint, displayName: string, folder: string): Promise<FileRecord | null>;
-    updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string): Promise<Opportunity | null>;
+    updateOpportunity(id: bigint, name: string, stage: string, value: bigint, closeDate: bigint, summary: string, helpTypes: Array<string>): Promise<Opportunity | null>;
     restoreCallerRole(): Promise<string>;
-    updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority?: string): Promise<TodoItem | null>;
+    updateTodoItem(id: bigint, title: string, assignedTo: string, stage: string, opportunityId: bigint | null, priority: string): Promise<TodoItem | null>;
 }

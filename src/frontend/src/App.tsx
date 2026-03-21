@@ -11,6 +11,7 @@ import Sidebar from "./components/Sidebar";
 import { UserProvider } from "./context/UserContext";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import CalendarPage from "./pages/CalendarPage";
+import ContactBioPage from "./pages/ContactBioPage";
 import ContactsPage from "./pages/ContactsPage";
 import Dashboard from "./pages/Dashboard";
 import OpportunityDetail from "./pages/OpportunityDetail";
@@ -107,6 +108,12 @@ const contactsRoute = createRoute({
   component: ContactsPage,
 });
 
+const contactBioRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/contacts/$id",
+  component: ContactBioPage,
+});
+
 const opportunityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/opportunity/$id",
@@ -122,6 +129,7 @@ const calendarRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   contactsRoute,
+  contactBioRoute,
   opportunityRoute,
   calendarRoute,
 ]);

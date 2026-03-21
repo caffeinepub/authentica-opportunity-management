@@ -33,6 +33,7 @@ export const Contact = IDL.Record({
   'name' : IDL.Text,
   'email' : IDL.Text,
   'phone' : IDL.Text,
+  'bio' : IDL.Text,
 });
 export const FileRecord = IDL.Record({
   'id' : IDL.Nat,
@@ -170,6 +171,7 @@ export const idlService = IDL.Service({
   'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
   'demoteToUser' : IDL.Func([IDL.Principal], [], []),
   'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'updateContactBio' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'unlinkContactFromOpportunity' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
   'updateContact' : IDL.Func(
@@ -222,6 +224,7 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'email' : IDL.Text,
     'phone' : IDL.Text,
+    'bio' : IDL.Text,
   });
   const FileRecord = IDL.Record({
     'id' : IDL.Nat,
@@ -362,6 +365,8 @@ export const idlFactory = ({ IDL }) => {
   'assignConfidentialRole' : IDL.Func([IDL.Principal], [], []),
   'demoteToUser' : IDL.Func([IDL.Principal], [], []),
     'removeContact' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'updateContactBio' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
+  'updateContactBio' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'unlinkContactFromOpportunity' : IDL.Func(
         [IDL.Nat, IDL.Nat],

@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Link } from "@tanstack/react-router";
 import {
   Edit2,
   Loader2,
@@ -299,7 +300,14 @@ export default function ContactsPage() {
                     className="hover:bg-muted/20"
                   >
                     <TableCell className="font-medium text-foreground">
-                      {contact.name}
+                      <Link
+                        to="/contacts/$id"
+                        params={{ id: contact.id.toString() }}
+                        className="hover:text-primary hover:underline cursor-pointer"
+                        data-ocid={`contacts.item.${idx + 1}.link`}
+                      >
+                        {contact.name}
+                      </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {contact.title || "—"}

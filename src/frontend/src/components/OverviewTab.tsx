@@ -15,6 +15,8 @@ import {
   useDeleteComment,
   useUpdateOpportunity,
 } from "../hooks/useQueries";
+import HelpTypeBadges from "./HelpTypeBadges";
+import HelpTypeSelector from "./HelpTypeSelector";
 
 function initials(name: string) {
   return name
@@ -35,6 +37,9 @@ export default function OverviewTab({
 }: { opportunity: Opportunity }) {
   const { userName } = useUser();
   const [summary, setSummary] = useState(opportunity.summary);
+  const [helpTypes, setHelpTypes] = useState<Array<string>>(
+    opportunity.helpTypes ?? [],
+  );
   const [commentText, setCommentText] = useState("");
 
   const commentsQuery = useComments(opportunity.id);
@@ -51,12 +56,18 @@ export default function OverviewTab({
         value: opportunity.value,
         closeDate: opportunity.closeDate,
         summary,
+        helpTypes,
       });
-      toast.success("Summary saved");
+      toast.success("Overview saved");
     } catch {
-      toast.error("Failed to save summary");
+      toast.error("Failed to save overview");
     }
   };
+
+  const isChanged =
+    summary !== opportunity.summary ||
+    JSON.stringify(helpTypes.slice().sort()) !==
+      JSON.stringify((opportunity.helpTypes ?? []).slice().sort());
 
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
@@ -86,17 +97,17 @@ export default function OverviewTab({
 
   return (
     <div className="space-y-8">
-      {/* Summary */}
+      {/* Summary + Help Types */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display text-base font-semibold text-foreground">
-            Summary
+            Overview
           </h3>
           <Button
             size="sm"
             variant="outline"
             onClick={handleSaveSummary}
-            disabled={updateOpp.isPending || summary === opportunity.summary}
+            disabled={updateOpp.isPending || !isChanged}
             className="gap-2"
           >
             {updateOpp.isPending ? (
@@ -107,14 +118,30 @@ export default function OverviewTab({
             Save
           </Button>
         </div>
-        <Textarea
-          data-ocid="overview.summary.textarea"
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          placeholder="Describe this opportunity — key context, goals, and status..."
-          rows={5}
-          className="resize-none"
-        />
+
+        <div className="space-y-4">
+          <Textarea
+            data-ocid="overview.summary.textarea"
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            placeholder="Describe this opportunity — key context, goals, and status..."
+            rows={5}
+            className="resize-none"
+          />
+
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+            <HelpTypeSelector
+              label="Type of Help"
+              value={helpTypes}
+              onChange={setHelpTypes}
+            />
+            {helpTypes.length > 0 && (
+              <div className="mt-2">
+                <HelpTypeBadges helpTypes={helpTypes} />
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       <Separator />

@@ -5,14 +5,16 @@ import type {
   Comment,
   Contact,
   FileRecord,
-  Opportunity,
   TodoItem,
   UserProfileDTO,
+  Opportunity as _Opportunity,
 } from "../backend";
 import { useActor } from "./useActor";
 
+// Extend Opportunity with the helpTypes field added in the backend
+export type Opportunity = _Opportunity & { helpTypes?: Array<string> };
+
 export type {
-  Opportunity,
   Contact,
   Comment,
   FileRecord,
@@ -29,7 +31,7 @@ export function useOpportunities() {
     queryKey: ["opportunities"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listOpportunities();
+      return (actor as any).listOpportunities() as Promise<Opportunity[]>;
     },
     enabled: !!actor && !isFetching,
   });
@@ -41,7 +43,7 @@ export function useOpportunity(id: bigint) {
     queryKey: ["opportunity", id.toString()],
     queryFn: async () => {
       if (!actor) return null;
-      return actor.getOpportunity(id);
+      return (actor as any).getOpportunity(id) as Promise<Opportunity | null>;
     },
     enabled: !!actor && !isFetching,
   });
@@ -57,15 +59,17 @@ export function useCreateOpportunity() {
       value: bigint;
       closeDate: bigint;
       summary: string;
+      helpTypes?: Array<string>;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.createOpportunity(
+      return (actor as any).createOpportunity(
         data.name,
         data.stage,
         data.value,
         data.closeDate,
         data.summary,
-      );
+        data.helpTypes ?? [],
+      ) as Promise<Opportunity>;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["opportunities"] }),
   });
@@ -82,18 +86,20 @@ export function useUpdateOpportunity() {
       value: bigint;
       closeDate: bigint;
       summary: string;
+      helpTypes?: Array<string>;
     }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateOpportunity(
+      return (actor as any).updateOpportunity(
         data.id,
         data.name,
         data.stage,
         data.value,
         data.closeDate,
         data.summary,
-      );
+        data.helpTypes ?? [],
+      ) as Promise<Opportunity | null>;
     },
-    onSuccess: (_data, vars) => {
+    onSuccess: (_data: any, vars: any) => {
       qc.invalidateQueries({ queryKey: ["opportunities"] });
       qc.invalidateQueries({ queryKey: ["opportunity", vars.id.toString()] });
     },
@@ -123,6 +129,58 @@ export function useAllContacts() {
       return actor.listAllContacts();
     },
     enabled: !!actor && !isFetching,
+  });
+}
+
+export function useContact(id: bigint) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Contact | null>({
+    queryKey: ["contact", id.toString()],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getContact(id);
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useUpdateContactBio() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { id: bigint; bio: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.updateContactBio(data.id, data.bio);
+    },
+    onSuccess: (_data: any, vars: any) => {
+      qc.invalidateQueries({ queryKey: ["contact", vars.id.toString()] });
+      qc.invalidateQueries({ queryKey: ["contacts"] });
+    },
+  });
+}
+
+export function useUpdateContactExtraFields() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      id: bigint;
+      company: string;
+      linkedinUrl: string;
+      lastContacted: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.updateContactExtraFields(
+        data.id,
+        data.company,
+        data.linkedinUrl,
+        data.lastContacted,
+      );
+    },
+    onSuccess: (_data: any, vars: any) => {
+      qc.invalidateQueries({ queryKey: ["contact", vars.id.toString()] });
+      qc.invalidateQueries({ queryKey: ["contacts"] });
+    },
   });
 }
 
@@ -268,7 +326,7 @@ export function useAddComment() {
       if (!actor) throw new Error("Not connected");
       return actor.addComment(data.opportunityId, data.authorName, data.text);
     },
-    onSuccess: (_data, vars) =>
+    onSuccess: (_data: any, vars: any) =>
       qc.invalidateQueries({
         queryKey: ["comments", vars.opportunityId.toString()],
       }),
@@ -283,7 +341,7 @@ export function useDeleteComment() {
       if (!actor) throw new Error("Not connected");
       return actor.deleteComment(data.id);
     },
-    onSuccess: (_data, vars) =>
+    onSuccess: (_data: any, vars: any) =>
       qc.invalidateQueries({
         queryKey: ["comments", vars.opportunityId.toString()],
       }),
@@ -326,7 +384,7 @@ export function useAddFileRecord() {
         data.uploadedBy,
       );
     },
-    onSuccess: (_data, vars) =>
+    onSuccess: (_data: any, vars: any) =>
       qc.invalidateQueries({
         queryKey: ["files", vars.opportunityId.toString()],
       }),
@@ -346,7 +404,7 @@ export function useUpdateFileRecord() {
       if (!actor) throw new Error("Not connected");
       return actor.updateFileRecord(data.id, data.displayName, data.folder);
     },
-    onSuccess: (_data, vars) =>
+    onSuccess: (_data: any, vars: any) =>
       qc.invalidateQueries({
         queryKey: ["files", vars.opportunityId.toString()],
       }),
@@ -361,7 +419,7 @@ export function useDeleteFileRecord() {
       if (!actor) throw new Error("Not connected");
       return actor.deleteFileRecord(data.id);
     },
-    onSuccess: (_data, vars) =>
+    onSuccess: (_data: any, vars: any) =>
       qc.invalidateQueries({
         queryKey: ["files", vars.opportunityId.toString()],
       }),

@@ -1,33 +1,35 @@
 # Authentica Opportunity Management
 
 ## Current State
-The app has a full admin page accessible via Shield icon in the sidebar. It includes:
-- User management (list users, remove users, change roles)
-- Role system (admin/confidential/user/guest)
-- Confidential file permissions per user
-- Configurable user cap (default 3)
-
-Corresponding backend endpoints: setMaxUsers, getMaxUsers, listAllUsersWithRoles, removeUser, makeAdmin, assignConfidentialRole, demoteToUser, setFileConfidential, grantFileAccess, revokeFileAccess, listFilePermissions, listAllFileRecordsAdmin, restoreCallerRole.
+- Opportunities have: id, name, stage, value, closeDate, summary, createdAt
+- No 'type of help' field exists
+- Opportunity creation form, overview tab, and Kanban pipeline cards do not display help types
 
 ## Requested Changes (Diff)
 
 ### Add
-- postupgrade logic to delete user named 'test' from userProfiles and stableUserRoles
+- `helpTypes: [Text]` field to Opportunity (multi-select: user growth/marketing, product development, capital)
+- Backend: versioned migration (InternalOpportunityV2 with helpTypes, migrate from V1)
+- Opportunity creation form: multi-select checkboxes for help types
+- Opportunity overview tab: editable multi-select for help types
+- Kanban pipeline cards: show small colored badges per selected help type
 
 ### Modify
-- Backend: remove all admin-only public functions listed above (keep getMaxUsers for UserContext cap check)
-- Frontend App.tsx: remove adminRoute and AdminPage import
-- Frontend Sidebar.tsx: remove Shield icon and Admin nav link
-- Frontend useQueries.ts: remove admin-related hooks (useAdminAllFileRecords, useFilePermissions, useSetFileConfidential, useGrantFileAccess, useRevokeFileAccess, useMakeAdmin, useAssignConfidentialRole, useDemoteToUser)
+- `createOpportunity` backend function to accept `helpTypes: [Text]` parameter
+- `updateOpportunity` backend function to accept `helpTypes: [Text]` parameter
+- `Opportunity` and `InternalOpportunity` types to include `helpTypes: [Text]`
+- `backend.d.ts` to reflect new Opportunity shape and updated function signatures
 
 ### Remove
-- src/frontend/src/pages/AdminPage.tsx
-- src/frontend/src/components/FilePermissionsSection.tsx
+- Nothing removed
 
 ## Implementation Plan
-1. Modify backend main.mo: add test-user-deletion in postupgrade; remove all admin-only public functions
-2. Update App.tsx: remove adminRoute and AdminPage
-3. Update Sidebar.tsx: remove Admin link and Shield import
-4. Update useQueries.ts: remove admin hooks
-5. Delete AdminPage.tsx and FilePermissionsSection.tsx (they will no longer be imported)
-6. Validate frontend build
+1. Add `InternalOpportunityV1` type alias for old shape
+2. Add `helpTypes: [Text]` to `InternalOpportunity` and `Opportunity` types
+3. Add `opportunitiesV2` stable var for migrated opportunities; add `opportunitiesV2Migrated` flag
+4. Migrate `opportunities` -> `opportunitiesV2` in postupgrade (defaulting helpTypes to [])
+5. Update `createOpportunity`, `updateOpportunity`, `getOpportunity`, `listOpportunities` to use V2
+6. Update `backend.d.ts`: add helpTypes to Opportunity, update createOpportunity/updateOpportunity signatures
+7. Frontend: add multi-select help type picker to creation form
+8. Frontend: add editable multi-select to opportunity overview tab
+9. Frontend: render small badges on Kanban pipeline cards

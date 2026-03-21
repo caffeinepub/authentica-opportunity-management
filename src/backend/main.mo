@@ -55,8 +55,8 @@ actor {
     };
   };
 
-  // Opportunity Types
-  public type Opportunity = {
+  // Opportunity V1 -- original shape without helpTypes
+  type InternalOpportunityV1 = {
     id : Nat;
     name : Text;
     stage : Text;
@@ -66,19 +66,30 @@ actor {
     createdAt : Int;
   };
 
-  module Opportunity {
-    func toInternal(ext : Opportunity) : InternalOpportunity {
-      {
-        id = ext.id;
-        name = ext.name;
-        stage = ext.stage;
-        value = ext.value;
-        closeDate = ext.closeDate;
-        summary = ext.summary;
-        createdAt = ext.createdAt;
-      };
-    };
+  // Opportunity V2 -- adds helpTypes
+  public type InternalOpportunity = {
+    id : Nat;
+    name : Text;
+    stage : Text;
+    value : Int;
+    closeDate : Int;
+    summary : Text;
+    createdAt : Int;
+    helpTypes : [Text];
+  };
 
+  public type Opportunity = {
+    id : Nat;
+    name : Text;
+    stage : Text;
+    value : Int;
+    closeDate : Int;
+    summary : Text;
+    createdAt : Int;
+    helpTypes : [Text];
+  };
+
+  module Opportunity {
     public func fromInternal(internal : InternalOpportunity) : Opportunity {
       {
         id = internal.id;
@@ -88,35 +99,14 @@ actor {
         closeDate = internal.closeDate;
         summary = internal.summary;
         createdAt = internal.createdAt;
+        helpTypes = internal.helpTypes;
       };
     };
-  };
-
-  public type InternalOpportunity = {
-    id : Nat;
-    name : Text;
-    stage : Text;
-    value : Int;
-    closeDate : Int;
-    summary : Text;
-    createdAt : Int;
   };
 
   module InternalOpportunity {
     public func compareByValue(a : InternalOpportunity, b : InternalOpportunity) : Order.Order {
       return Int.compare(a.value, b.value);
-    };
-
-    func fromInternal(internal : InternalOpportunity) : Opportunity {
-      {
-        id = internal.id;
-        name = internal.name;
-        stage = internal.stage;
-        value = internal.value;
-        closeDate = internal.closeDate;
-        summary = internal.summary;
-        createdAt = internal.createdAt;
-      };
     };
   };
 
@@ -128,21 +118,14 @@ actor {
     phone : Text;
     title : Text;
     linkedOpportunityIds : [Nat];
+    bio : Text;
+    company : Text;
+    linkedinUrl : Text;
+    lastContacted : Text;
   };
 
   module Contact {
-    func toInternal(ext : Contact) : InternalContact {
-      {
-        id = ext.id;
-        name = ext.name;
-        email = ext.email;
-        phone = ext.phone;
-        title = ext.title;
-        linkedOpportunityIds = ext.linkedOpportunityIds;
-      };
-    };
-
-    public func fromInternal(internal : InternalContact) : Contact {
+    public func fromInternal(internal : InternalContact, bio : Text, company : Text, linkedinUrl : Text, lastContacted : Text) : Contact {
       {
         id = internal.id;
         name = internal.name;
@@ -150,6 +133,10 @@ actor {
         phone = internal.phone;
         title = internal.title;
         linkedOpportunityIds = internal.linkedOpportunityIds;
+        bio;
+        company;
+        linkedinUrl;
+        lastContacted;
       };
     };
   };
@@ -163,19 +150,6 @@ actor {
     linkedOpportunityIds : [Nat];
   };
 
-  module InternalContact {
-    func fromInternal(internal : InternalContact) : Contact {
-      {
-        id = internal.id;
-        name = internal.name;
-        email = internal.email;
-        phone = internal.phone;
-        title = internal.title;
-        linkedOpportunityIds = internal.linkedOpportunityIds;
-      };
-    };
-  };
-
   // Comment Types
   public type Comment = {
     id : Nat;
@@ -186,16 +160,6 @@ actor {
   };
 
   module Comment {
-    func toInternal(ext : Comment) : InternalComment {
-      {
-        id = ext.id;
-        opportunityId = ext.opportunityId;
-        authorName = ext.authorName;
-        text = ext.text;
-        createdAt = ext.createdAt;
-      };
-    };
-
     public func fromInternal(internal : InternalComment) : Comment {
       {
         id = internal.id;
@@ -213,18 +177,6 @@ actor {
     authorName : Text;
     text : Text;
     createdAt : Int;
-  };
-
-  module InternalComment {
-    func fromInternal(internal : InternalComment) : Comment {
-      {
-        id = internal.id;
-        opportunityId = internal.opportunityId;
-        authorName = internal.authorName;
-        text = internal.text;
-        createdAt = internal.createdAt;
-      };
-    };
   };
 
   // FileRecord V1 -- original shape without isConfidential.
@@ -282,7 +234,7 @@ actor {
 
   // User Profile Type
   public type UserProfile = {
-    name : Text; // Display name
+    name : Text;
   };
 
   public type UserProfileDTO = {
@@ -290,7 +242,6 @@ actor {
     name : Text;
   };
 
-  // Admin: User with role info
   public type UserWithRole = {
     principal : Principal;
     name : Text;
@@ -314,7 +265,6 @@ actor {
     #done;
   };
 
-  // TodoItem V1 -- original shape (no opportunityId)
   type TodoItemV1 = {
     id : Nat;
     title : Text;
@@ -323,7 +273,6 @@ actor {
     createdAt : Int;
   };
 
-  // TodoItem V2 -- added opportunityId
   type TodoItemV2 = {
     id : Nat;
     title : Text;
@@ -333,7 +282,6 @@ actor {
     opportunityId : ?Nat;
   };
 
-  // TodoItem V3 (current) -- adds priority field
   public type TodoItem = {
     id : Nat;
     title : Text;
@@ -341,42 +289,43 @@ actor {
     stage : Text;
     createdAt : Int;
     opportunityId : ?Nat;
-    priority : Text; // "low" | "medium" | "high"
+    priority : Text;
   };
 
-  // File permissions entry
   public type FilePermissionEntry = {
     fileId : Nat;
     allowedUsers : [Principal];
   };
 
   // Persistent Storage - stable vars survive canister upgrades
-  stable var opportunities = Map.empty<Nat, InternalOpportunity>();
+  // V1 opportunities (old shape, kept for migration)
+  stable var opportunities = Map.empty<Nat, InternalOpportunityV1>();
+  // V2 opportunities (with helpTypes)
+  stable var opportunitiesV2 = Map.empty<Nat, InternalOpportunity>();
+  stable var opportunitiesV2Migrated = false;
+
   stable var contacts = Map.empty<Nat, InternalContact>();
+  stable var contactBios = Map.empty<Nat, Text>();
+  stable var contactCompany = Map.empty<Nat, Text>();
+  stable var contactLinkedinUrl = Map.empty<Nat, Text>();
+  stable var contactLastContacted = Map.empty<Nat, Text>();
   stable var comments = Map.empty<Nat, InternalComment>();
-  // V1 stable var kept for migration -- do NOT use at runtime
   stable var fileRecords = Map.empty<Nat, InternalFileRecordV1>();
-  // V2 stable var -- all runtime code uses this
   stable var fileRecordsV2 = Map.empty<Nat, InternalFileRecord>();
   stable var fileRecordsMigrated = false;
-  // Per-file list of principals allowed to see confidential files
   stable var filePermissions = Map.empty<Nat, [Principal]>();
   stable var userProfiles = Map.empty<Principal, UserProfile>();
   stable var calendarItems = Map.empty<Nat, CalendarItem>();
   stable var contactLinks = Map.empty<Nat, [Nat]>();
 
-  // TodoItem migration stable vars
   stable var todoItems = Map.empty<Nat, TodoItemV1>();
   stable var todoItemsV2 = Map.empty<Nat, TodoItemV2>();
   stable var todoItemsMigrated = false;
-  // V3 adds priority
   stable var todoItemsV3 = Map.empty<Nat, TodoItem>();
   stable var todoItemsV3Migrated = false;
 
-  // Admin settings
   stable var maxUsers : Nat = 3;
 
-  // ID Counters - stable so they don't reset on upgrade
   stable var opportunityCounter = 0;
   stable var contactCounter = 0;
   stable var commentCounter = 0;
@@ -388,11 +337,9 @@ actor {
   stable var allUsersAdminMigrated = false;
   stable var testUserDeleted = false;
   stable var confidentialUsers = Map.empty<Principal, Bool>();
-  // Stable storage for access control roles (persists across upgrades)
   stable var stableUserRoles = Map.empty<Principal, Text>();
   stable var stableAdminAssigned = false;
 
-  // Save access control roles before upgrade
   system func preupgrade() {
     stableUserRoles := Map.empty<Principal, Text>();
     for ((principal, role) in accessControlState.userRoles.toArray().vals()) {
@@ -406,9 +353,8 @@ actor {
     stableAdminAssigned := accessControlState.adminAssigned;
   };
 
-  // Run migrations on upgrade
   system func postupgrade() {
-    // Restore access control roles from stable storage
+    // Restore access control roles
     for ((principal, roleText) in stableUserRoles.toArray().vals()) {
       let role = switch (roleText) {
         case ("admin") { #admin };
@@ -418,6 +364,25 @@ actor {
       accessControlState.userRoles.add(principal, role);
     };
     accessControlState.adminAssigned := stableAdminAssigned;
+
+    // Migrate Opportunity V1 -> V2 (add helpTypes = [])
+    if (not opportunitiesV2Migrated) {
+      for ((k, v) in opportunities.toArray().vals()) {
+        if (not opportunitiesV2.containsKey(k)) {
+          opportunitiesV2.add(k, {
+            id = v.id;
+            name = v.name;
+            stage = v.stage;
+            value = v.value;
+            closeDate = v.closeDate;
+            summary = v.summary;
+            createdAt = v.createdAt;
+            helpTypes = [];
+          });
+        };
+      };
+      opportunitiesV2Migrated := true;
+    };
 
     // Migrate TodoItem V1 -> V2
     if (not todoItemsMigrated) {
@@ -433,7 +398,7 @@ actor {
       };
       todoItemsMigrated := true;
     };
-    // Migrate TodoItem V2 -> V3 (add priority = "medium" for existing items)
+    // Migrate TodoItem V2 -> V3
     if (not todoItemsV3Migrated) {
       for ((k, v) in todoItemsV2.toArray().vals()) {
         todoItemsV3.add(k, {
@@ -465,7 +430,6 @@ actor {
       };
       fileRecordsMigrated := true;
     };
-    // Migrate: promote all existing #user roles to #admin (one-time migration)
     if (not userRolesMigrated) {
       for ((principal, role) in accessControlState.userRoles.toArray().vals()) {
         switch (role) {
@@ -477,7 +441,6 @@ actor {
       };
       userRolesMigrated := true;
     };
-    // Migration: promote ALL registered users to admin (replaces partial migration)
     if (not allUsersAdminMigrated) {
       for ((principal, _) in userProfiles.toArray().vals()) {
         accessControlState.userRoles.add(principal, #admin);
@@ -486,8 +449,6 @@ actor {
       accessControlState.adminAssigned := true;
       allUsersAdminMigrated := true;
     };
-  };
-    // Migration: remove user named "test" if present
     if (not testUserDeleted) {
       let toRemove = userProfiles.toArray().filter(
         func((_, profile) : (Principal, UserProfile)) : Bool {
@@ -500,21 +461,17 @@ actor {
       };
       testUserDeleted := true;
     };
+  };
 
-  // Helper Functions
   func ensureUserRegistered(caller : Principal) {
     if (not userProfiles.containsKey(caller)) {
-      // Enforce max users limit
       if (userProfiles.size() >= maxUsers) {
         Runtime.trap("User limit reached: maximum " # maxUsers.toText() # " users allowed");
       };
-      // Add default profile if not exists
       userProfiles.add(caller, { name = "" });
     };
   };
 
-
-  // Helper: restore caller role from stable storage so admin checks work across upgrades
   func _restoreCallerRoleFromStable(caller : Principal) {
     switch (stableUserRoles.get(caller)) {
       case (?roleText) {
@@ -535,7 +492,6 @@ actor {
     };
   };
 
-  // Helper: check if caller can access a confidential file
   func canAccessFile(caller : Principal, fileId : Nat) : Bool {
     if (AccessControl.isAdmin(accessControlState, caller)) { return true };
     if (confidentialUsers.containsKey(caller)) { return true };
@@ -547,12 +503,10 @@ actor {
     };
   };
 
-  // Admin: Get max users limit
   public query func getMaxUsers() : async Nat {
     maxUsers;
   };
 
-  // User Profile Functions
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -586,8 +540,8 @@ actor {
     );
   };
 
-  // Opportunity Functions
-  public shared ({ caller }) func createOpportunity(name : Text, stage : Text, value : Int, closeDate : Int, summary : Text) : async Opportunity {
+  // Opportunity Functions (V2)
+  public shared ({ caller }) func createOpportunity(name : Text, stage : Text, value : Int, closeDate : Int, summary : Text, helpTypes : [Text]) : async Opportunity {
     ensureUserRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can create opportunities");
@@ -602,21 +556,22 @@ actor {
       closeDate;
       summary;
       createdAt = currentTime;
+      helpTypes;
     };
 
-    opportunities.add(opportunity.id, opportunity);
+    opportunitiesV2.add(opportunity.id, opportunity);
     opportunityCounter += 1;
 
     Opportunity.fromInternal(opportunity);
   };
 
-  public shared ({ caller }) func updateOpportunity(id : Nat, name : Text, stage : Text, value : Int, closeDate : Int, summary : Text) : async ?Opportunity {
+  public shared ({ caller }) func updateOpportunity(id : Nat, name : Text, stage : Text, value : Int, closeDate : Int, summary : Text, helpTypes : [Text]) : async ?Opportunity {
     ensureUserRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can update opportunities");
     };
 
-    switch (opportunities.get(id)) {
+    switch (opportunitiesV2.get(id)) {
       case (null) { null };
       case (?existing) {
         let updated : InternalOpportunity = {
@@ -627,10 +582,11 @@ actor {
           closeDate;
           summary;
           createdAt = existing.createdAt;
+          helpTypes;
         };
 
-        opportunities.add(id, updated);
-        ?Opportunity.fromInternal(existing);
+        opportunitiesV2.add(id, updated);
+        ?Opportunity.fromInternal(updated);
       };
     };
   };
@@ -641,9 +597,9 @@ actor {
       Runtime.trap("Unauthorized: Only users can delete opportunities");
     };
 
-    switch (opportunities.containsKey(id)) {
+    switch (opportunitiesV2.containsKey(id)) {
       case (true) {
-        opportunities.remove(id);
+        opportunitiesV2.remove(id);
         true;
       };
       case (false) { false };
@@ -655,7 +611,7 @@ actor {
       Runtime.trap("Unauthorized: Only users can view opportunities");
     };
 
-    switch (opportunities.get(id)) {
+    switch (opportunitiesV2.get(id)) {
       case (null) { null };
       case (?op) { ?Opportunity.fromInternal(op) };
     };
@@ -666,11 +622,10 @@ actor {
       Runtime.trap("Unauthorized: Only users can list opportunities");
     };
 
-    opportunities.values().toArray().map<InternalOpportunity, Opportunity>(func(internal) { Opportunity.fromInternal(internal) });
+    opportunitiesV2.values().toArray().map<InternalOpportunity, Opportunity>(func(internal) { Opportunity.fromInternal(internal) });
   };
 
   // Contact Functions
-
   public shared ({ caller }) func addContact(name : Text, email : Text, phone : Text, title : Text) : async Contact {
     ensureUserRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -689,7 +644,7 @@ actor {
     contacts.add(contact.id, contact);
     contactCounter += 1;
 
-    Contact.fromInternal(contact);
+    Contact.fromInternal(contact, "", "", "", "");
   };
 
   public shared ({ caller }) func addContactAndLink(name : Text, email : Text, phone : Text, title : Text, opportunityId : Nat) : async Contact {
@@ -710,7 +665,7 @@ actor {
     contacts.add(contact.id, contact);
     contactCounter += 1;
 
-    Contact.fromInternal(contact);
+    Contact.fromInternal(contact, "", "", "", "");
   };
 
   public shared ({ caller }) func linkContactToOpportunity(contactId : Nat, opportunityId : Nat) : async Bool {
@@ -754,7 +709,7 @@ actor {
       Runtime.trap("Unauthorized: Only users can list contacts");
     };
 
-    contacts.values().toArray().map<InternalContact, Contact>(func(internal) { Contact.fromInternal(internal) });
+    contacts.values().toArray().map<InternalContact, Contact>(func(internal) { Contact.fromInternal(internal, (switch (contactBios.get(internal.id)) { case (?b) b; case null "" }), (switch (contactCompany.get(internal.id)) { case (?c) c; case null "" }), (switch (contactLinkedinUrl.get(internal.id)) { case (?l) l; case null "" }), (switch (contactLastContacted.get(internal.id)) { case (?d) d; case null "" })) });
   };
 
   public query ({ caller }) func listContactsByOpportunity(opportunityId : Nat) : async [Contact] {
@@ -762,7 +717,7 @@ actor {
       Runtime.trap("Unauthorized: Only users can list contacts");
     };
 
-    contacts.values().toArray().filter(func(c) { c.linkedOpportunityIds.find(func(id) { id == opportunityId }) != null }).map<InternalContact, Contact>(func(internal) { Contact.fromInternal(internal) });
+    contacts.values().toArray().filter(func(c) { c.linkedOpportunityIds.find(func(id) { id == opportunityId }) != null }).map<InternalContact, Contact>(func(internal) { Contact.fromInternal(internal, (switch (contactBios.get(internal.id)) { case (?b) b; case null "" }), (switch (contactCompany.get(internal.id)) { case (?c) c; case null "" }), (switch (contactLinkedinUrl.get(internal.id)) { case (?l) l; case null "" }), (switch (contactLastContacted.get(internal.id)) { case (?d) d; case null "" })) });
   };
 
   public shared ({ caller }) func updateContact(id : Nat, name : Text, email : Text, phone : Text, title : Text) : async ?Contact {
@@ -784,7 +739,37 @@ actor {
         };
 
         contacts.add(id, updated);
-        ?Contact.fromInternal(existing);
+        ?Contact.fromInternal(existing, (switch (contactBios.get(id)) { case (?b) b; case null "" }), (switch (contactCompany.get(id)) { case (?c) c; case null "" }), (switch (contactLinkedinUrl.get(id)) { case (?l) l; case null "" }), (switch (contactLastContacted.get(id)) { case (?d) d; case null "" }));
+      };
+    };
+  };
+
+  public shared ({ caller }) func updateContactBio(id : Nat, bio : Text) : async Bool {
+    ensureUserRegistered(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can update contacts");
+    };
+    switch (contacts.get(id)) {
+      case (null) { false };
+      case (?_) {
+        contactBios.add(id, bio);
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func updateContactExtraFields(id : Nat, company : Text, linkedinUrl : Text, lastContacted : Text) : async Bool {
+    ensureUserRegistered(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can update contacts");
+    };
+    switch (contacts.get(id)) {
+      case (null) { false };
+      case (?_) {
+        contactCompany.add(id, company);
+        contactLinkedinUrl.add(id, linkedinUrl);
+        contactLastContacted.add(id, lastContacted);
+        true;
       };
     };
   };
@@ -811,7 +796,7 @@ actor {
 
     switch (contacts.get(id)) {
       case (null) { null };
-      case (?contact) { ?Contact.fromInternal(contact) };
+      case (?contact) { ?Contact.fromInternal(contact, (switch (contactBios.get(contact.id)) { case (?b) b; case null "" }), (switch (contactCompany.get(contact.id)) { case (?c) c; case null "" }), (switch (contactLinkedinUrl.get(contact.id)) { case (?l) l; case null "" }), (switch (contactLastContacted.get(contact.id)) { case (?d) d; case null "" })) };
     };
   };
 
@@ -929,7 +914,6 @@ actor {
     };
   };
 
-  // listFileRecords: filters out confidential files unless caller has access
   public query ({ caller }) func listFileRecords(opportunityId : Nat) : async [FileRecord] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #guest))) {
       Runtime.trap("Unauthorized: Only users can list file records");
@@ -992,7 +976,7 @@ actor {
     calendarItems.values().toArray();
   };
 
-  // TodoItem V3 -- all runtime functions use todoItemsV3
+  // TodoItem V3
   public shared ({ caller }) func createTodoItem(title : Text, assignedTo : Text, stage : Text, opportunityId : ?Nat, priority : Text) : async TodoItem {
     ensureUserRegistered(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {

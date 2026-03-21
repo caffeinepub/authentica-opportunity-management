@@ -44,6 +44,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import ContactsTab from "../components/ContactsTab";
 import FilesTab from "../components/FilesTab";
+import HelpTypeSelector from "../components/HelpTypeSelector";
 import OverviewTab from "../components/OverviewTab";
 import StageBadge from "../components/StageBadge";
 import {
@@ -80,6 +81,7 @@ export default function OpportunityDetail() {
   const [editValue, setEditValue] = useState("");
   const [editCloseDate, setEditCloseDate] = useState("");
   const [editSummary, setEditSummary] = useState("");
+  const [editHelpTypes, setEditHelpTypes] = useState<Array<string>>([]);
 
   const openEdit = () => {
     if (!opportunity) return;
@@ -91,6 +93,7 @@ export default function OpportunityDetail() {
       new Date(Number(opportunity.closeDate)).toISOString().split("T")[0],
     );
     setEditSummary(opportunity.summary);
+    setEditHelpTypes(opportunity.helpTypes ?? []);
     setEditOpen(true);
   };
 
@@ -118,6 +121,7 @@ export default function OpportunityDetail() {
         value: valueNum,
         closeDate: closeDateMs,
         summary: editSummary.trim(),
+        helpTypes: editHelpTypes,
       });
       toast.success("Opportunity updated");
       setEditOpen(false);
@@ -357,6 +361,13 @@ export default function OpportunityDetail() {
                 onChange={(e) => setEditSummary(e.target.value)}
                 rows={3}
                 className="mt-1"
+              />
+            </div>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+              <HelpTypeSelector
+                label="Type of Help"
+                value={editHelpTypes}
+                onChange={setEditHelpTypes}
               />
             </div>
           </div>
