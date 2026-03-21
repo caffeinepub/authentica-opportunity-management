@@ -304,76 +304,6 @@ export function useFileRecords(opportunityId: bigint) {
   });
 }
 
-export function useAdminAllFileRecords() {
-  const { actor, isFetching } = useActor();
-  return useQuery<FileRecord[]>({
-    queryKey: ["admin", "files", "all"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return (actor as any).listAllFileRecordsAdmin();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useFilePermissions(fileId: bigint, enabled: boolean) {
-  const { actor, isFetching } = useActor();
-  return useQuery<Principal[]>({
-    queryKey: ["filePermissions", fileId.toString()],
-    queryFn: async () => {
-      if (!actor) return [];
-      return (actor as any).listFilePermissions(fileId);
-    },
-    enabled: !!actor && !isFetching && enabled,
-  });
-}
-
-export function useSetFileConfidential() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: { fileId: bigint; confidential: boolean }) => {
-      if (!actor) throw new Error("Not connected");
-      return (actor as any).setFileConfidential(data.fileId, data.confidential);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin", "files", "all"] });
-    },
-  });
-}
-
-export function useGrantFileAccess() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: { fileId: bigint; user: Principal }) => {
-      if (!actor) throw new Error("Not connected");
-      return (actor as any).grantFileAccess(data.fileId, data.user);
-    },
-    onSuccess: (_data: any, vars: { fileId: bigint; user: Principal }) => {
-      qc.invalidateQueries({
-        queryKey: ["filePermissions", vars.fileId.toString()],
-      });
-    },
-  });
-}
-
-export function useRevokeFileAccess() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: { fileId: bigint; user: Principal }) => {
-      if (!actor) throw new Error("Not connected");
-      return (actor as any).revokeFileAccess(data.fileId, data.user);
-    },
-    onSuccess: (_data: any, vars: { fileId: bigint; user: Principal }) => {
-      qc.invalidateQueries({
-        queryKey: ["filePermissions", vars.fileId.toString()],
-      });
-    },
-  });
-}
-
 export function useAddFileRecord() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -577,47 +507,5 @@ export function useUserProfiles() {
       return actor.listAllUserProfiles();
     },
     enabled: !!actor && !isFetching,
-  });
-}
-
-// ── Admin Role Management ───────────────────────────────────────────────────
-// All role changes go through the backend's assignCallerUserRole method.
-
-export function useMakeAdmin() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
-      if (!actor) throw new Error("Not connected");
-      // Use assignCallerUserRole with 'admin' role tag
-      return actor.assignCallerUserRole(user, { admin: null } as any);
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
-  });
-}
-
-export function useAssignConfidentialRole() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
-      if (!actor) throw new Error("Not connected");
-      // Use assignCallerUserRole with 'confidential' role tag
-      return actor.assignCallerUserRole(user, { confidential: null } as any);
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
-  });
-}
-
-export function useDemoteToUser() {
-  const { actor } = useActor();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (user: import("@icp-sdk/core/principal").Principal) => {
-      if (!actor) throw new Error("Not connected");
-      // Use assignCallerUserRole with 'user' role tag
-      return actor.assignCallerUserRole(user, { user: null } as any);
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["allUsersWithRoles"] }),
   });
 }

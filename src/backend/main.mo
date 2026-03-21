@@ -386,6 +386,7 @@ actor {
 
   stable var userRolesMigrated = false;
   stable var allUsersAdminMigrated = false;
+  stable var testUserDeleted = false;
   stable var confidentialUsers = Map.empty<Principal, Bool>();
   // Stable storage for access control roles (persists across upgrades)
   stable var stableUserRoles = Map.empty<Principal, Text>();
@@ -486,6 +487,19 @@ actor {
       allUsersAdminMigrated := true;
     };
   };
+    // Migration: remove user named "test" if present
+    if (not testUserDeleted) {
+      let toRemove = userProfiles.toArray().filter(
+        func((_, profile) : (Principal, UserProfile)) : Bool {
+          profile.name == "test"
+        }
+      );
+      for ((principal, _) in toRemove.vals()) {
+        userProfiles.remove(principal);
+        stableUserRoles.remove(principal);
+      };
+      testUserDeleted := true;
+    };
 
   // Helper Functions
   func ensureUserRegistered(caller : Principal) {
@@ -536,206 +550,6 @@ actor {
   // Admin: Get max users limit
   public query func getMaxUsers() : async Nat {
     maxUsers;
-  };
-
-  // Admin: Set max users limit (admin only)
-  public shared ({ caller }) func setMaxUsers(limit : Nat) : async () {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can set user limit");
-    };
-    maxUsers := limit;
-  };
-
-  // Admin: List all users with their roles
-  public shared ({ caller }) func listAllUsersWithRoles() : async [UserWithRole] {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can list users with roles");
-    };
-    userProfiles.toArray().map<(Principal, UserProfile), UserWithRole>(
-      func((principal, profile)) {
-        let baseRole = switch (AccessControl.getUserRole(accessControlState, principal)) {
-          case (#admin) { "admin" };
-          case (#user) {
-            if (confidentialUsers.containsKey(principal)) { "confidential" } else { "user" };
-          };
-          case (#guest) { "guest" };
-        };
-        let role = baseRole;
-        { principal; name = profile.name; role };
-      }
-    );
-  };
-
-  // Admin: Remove a user (admin only)
-  public shared ({ caller }) func removeUser(user : Principal) : async () {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can remove users");
-    };
-    if (caller == user) {
-      Runtime.trap("Cannot remove yourself");
-    };
-    userProfiles.remove(user);
-    // Also remove from stableUserRoles so they can't restore their own role
-    stableUserRoles.remove(user);
-    // Demote to guest role
-    AccessControl.assignRole(accessControlState, caller, user, #guest);
-  };
-
-  // Admin: Promote a user to admin role
-  public shared ({ caller }) func makeAdmin(user : Principal) : async () {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can make other admins");
-    };
-    accessControlState.userRoles.add(user, #admin);
-    stableUserRoles.add(user, "admin");
-    confidentialUsers.remove(user); // admins already have full access
-  };
-
-  // Admin: Assign confidential role to a user (can view confidential files)
-  public shared ({ caller }) func assignConfidentialRole(user : Principal) : async () {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can assign confidential role");
-    };
-    // Ensure user has at least #user role so they can write
-    let currentRole = AccessControl.getUserRole(accessControlState, user);
-    switch (currentRole) {
-      case (#guest) {
-        // Promote guest to user first
-        accessControlState.userRoles.add(user, #user);
-        stableUserRoles.add(user, "confidential");
-      };
-      case (_) {
-        stableUserRoles.add(user, "confidential");
-      };
-    };
-    confidentialUsers.add(user, true);
-  };
-
-  // Admin: Demote a user to regular user role (removes confidential access)
-  public shared ({ caller }) func demoteToUser(user : Principal) : async () {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can change user roles");
-    };
-    if (caller == user) {
-      Runtime.trap("Cannot demote yourself");
-    };
-    accessControlState.userRoles.add(user, #user);
-    stableUserRoles.add(user, "user");
-    confidentialUsers.remove(user);
-  };
-
-  // Admin: Mark/unmark a file as confidential
-  public shared ({ caller }) func setFileConfidential(fileId : Nat, confidential : Bool) : async Bool {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can set file confidentiality");
-    };
-    switch (fileRecordsV2.get(fileId)) {
-      case (null) { false };
-      case (?existing) {
-        let updated : InternalFileRecord = {
-          existing with
-          isConfidential = confidential;
-        };
-        fileRecordsV2.add(fileId, updated);
-        // If marking as not confidential, clear permissions
-        if (not confidential) {
-          filePermissions.remove(fileId);
-        };
-        true;
-      };
-    };
-  };
-
-  // Admin: Grant a user access to a confidential file
-  public shared ({ caller }) func grantFileAccess(fileId : Nat, user : Principal) : async Bool {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can grant file access");
-    };
-    let current = switch (filePermissions.get(fileId)) {
-      case (null) { [] };
-      case (?list) { list };
-    };
-    // Only add if not already present
-    if (current.find(func(p : Principal) : Bool { p == user }) == null) {
-      filePermissions.add(fileId, current.concat([user]));
-    };
-    true;
-  };
-
-  // Admin: Revoke a user's access to a confidential file
-  public shared ({ caller }) func revokeFileAccess(fileId : Nat, user : Principal) : async Bool {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can revoke file access");
-    };
-    switch (filePermissions.get(fileId)) {
-      case (null) { true };
-      case (?list) {
-        let filtered = list.filter(func(p : Principal) : Bool { p != user });
-        filePermissions.add(fileId, filtered);
-        true;
-      };
-    };
-  };
-
-  // Admin: List principals with access to a specific file
-  public query ({ caller }) func listFilePermissions(fileId : Nat) : async [Principal] {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can list file permissions");
-    };
-    switch (filePermissions.get(fileId)) {
-      case (null) { [] };
-      case (?list) { list };
-    };
-  };
-
-  // Admin: List all file records across all opportunities (for permissions management UI)
-  public query ({ caller }) func listAllFileRecordsAdmin() : async [FileRecord] {
-    _restoreCallerRoleFromStable(caller);
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can list all file records");
-    };
-    fileRecordsV2.values().toArray().map<InternalFileRecord, FileRecord>(func(internal) { FileRecord.fromInternal(internal) });
-  };
-
-  // Restore the caller's previously-assigned role from stable storage.
-  // Called from the frontend after _initializeAccessControlWithSecret to counteract
-  // any role overwrite the mixin may perform on each initialization call.
-  public shared ({ caller }) func restoreCallerRole() : async Text {
-    switch (stableUserRoles.get(caller)) {
-      case (?roleText) {
-        // Map stable role text back to actual access control role
-        // "confidential" users have #user role in access control (confidentialUsers map handles the rest)
-        let role = switch (roleText) {
-          case ("admin") { #admin };
-          case ("confidential") { #user };
-          case ("user") { #user };
-          case (_) { #guest };
-        };
-        // Re-apply the saved role so any mixin overwrite is undone
-        accessControlState.userRoles.add(caller, role);
-        roleText;
-      };
-      case (null) {
-        // If caller is a registered user with no stored role, promote to admin
-        if (userProfiles.containsKey(caller)) {
-          accessControlState.userRoles.add(caller, #admin);
-          stableUserRoles.add(caller, "admin");
-          "admin";
-        } else {
-          "guest";
-        };
-      };
-    };
   };
 
   // User Profile Functions

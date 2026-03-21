@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
-  Shield,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -66,14 +65,6 @@ export default function Sidebar() {
         >
           <Calendar className="w-4 h-4 shrink-0" />
           Calendar
-        </Link>
-        <Link
-          to="/admin"
-          data-ocid="nav.admin.link"
-          className={navItemClass("/admin")}
-        >
-          <Shield className="w-4 h-4 shrink-0" />
-          Admin
         </Link>
       </nav>
 
